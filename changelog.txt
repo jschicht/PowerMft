@@ -1,3 +1,5 @@
+v1.0.0.1
+Added functionality to modify $AttrDef, the Attribute Definition Table.
 
 v1.0.0.0 
 Initial version.

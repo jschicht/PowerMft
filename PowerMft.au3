@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Advanced $MFT modification tool for NTFS
 #AutoIt3Wrapper_Res_Description=Advanced $MFT modification tool for NTFS
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.0
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.1
 #AutoIt3Wrapper_Res_LegalCopyright=Joakim Schicht
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #AutoIt3Wrapper_Res_File_Add=C:\tmp\sectorio.sys
@@ -20,12 +20,14 @@
 ; https://github.com/jschicht
 
 ;Global $DoRead=0
+Global $NewAttrDefExistingAttrName,$NewAttrDefAttrName,$NewAttrDefAttrCode,$NewAttrDefDisplayRule,$NewAttrDefCollationRule,$NewAttrDefFlags,$NewAttrDefMinLength,$NewAttrDefMaxLength
+Global $DoAttrDefExistingAttrName=0,$DoAttrDefAttrName=0,$DoAttrDefAttrCode=0,$DoAttrDefDisplayRule=0,$DoAttrDefCollationRule=0,$DoAttrDefFlags=0,$DoAttrDefMinLength=0,$DoAttrDefMaxLength=0,$GlobalAttrDefFlag=0
 Global $GlobalWorkCounter=0, $VerboseOn=0, $FNCoreFileName, $FNForceFileName
 Global $GlobalReparseR_EntryNumberArr[1][2],$GlobalReparseR_DataOffset[1][2],$GlobalReparseR_DataSize[1][2],$GlobalReparseR_Padding4b[1][2],$GlobalReparseR_IndexEntrySize[1][2],$GlobalReparseR_IndexKeySize[1][2],$GlobalReparseR_Flags[1][2]
 Global $GlobalReparseR_KeyReparseTag[1][2],$GlobalReparseR_KeyMftRefOfReparsePoint[1][2],$GlobalReparseR_KeyMftRefSeqNoOfReparsePoint[1][2],$GlobalReparseR_KeyPadding[1][2]
 Global $GlobalObjIdO_EntryNumberArr[1][2],$GlobalObjIdO_DataOffset[1][2],$GlobalObjIdO_DataSize[1][2],$GlobalObjIdO_Padding[1][2],$GlobalObjIdO_IndexEntrySize[1][2],$GlobalObjIdO_IndexKeySize[1][2],$GlobalObjIdO_Flags[1][2]
 Global $GlobalObjIdO_GUIDObjectId[1][2],$GlobalObjIdO_MftRef[1][2],$GlobalObjIdO_MftSeqNo[1][2],$GlobalObjIdO_GUIDBirthVolumeId[1][2],$GlobalObjIdO_GUIDBirthObjectId[1][2],$GlobalObjIdO_GUIDDomainId[1][2]
-Global $HdrArrValue[17][2], $HdrArrOffset[17][2], $HdrArrSize[17][2], $IsObjIdO=0,$IsReparseR=0
+Global $HdrArrValue[17][2], $HdrArrOffset[17][2], $HdrArrSize[17][2], $IsObjIdO=0,$IsReparseR=0,$IsAttrDef=0
 Global $NewHdr_signature,$NewHdr_UpdSeqArrOffset,$NewHdr_UpdSeqArrSize,$NewHdr_UpdSeqArrNumber,$NewHdr_UpdSeqArr,$NewHdr_LSN,$NewHdr_SequenceNo,$NewHdr_HardLinkCount,$NewHdr_AttributeOffset,$NewHdr_Flags,$NewHdr_RecordRealSize,$NewHdr_RecordAllocatedSize
 Global $DoHdrSignature,$DoHdrUpdSeqArrOffset,$DoHdrUpdSeqArrSize,$DoHdrUpdSeqArrNumber,$DoHdrUpdSeqArr,$DoHdrLSN,$DoHdrSequenceNo,$DoHdrHardLinkCount,$DoHdrAttributeOffset,$DoHdrFlags,$DoHdrRecordRealSize,$DoHdrRecordAllocatedSize
 Global $NewHdr_BaseRecord,$NewHdr_BaseRecordSeqNo,$NewHdr_NextAttributeId,$NewHdr_Padding,$NewHdr_MFTREcordNumber
@@ -45,7 +47,7 @@ Global $IsolatedAttributeList, $AttribListNonResident=0,$IsCompressed,$IsSparse,
 Global $RUN_VCN[1],$RUN_Clusters[1],$MFT_RUN_Clusters[1],$MFT_RUN_VCN[1],$DataQ[1],$sBuffer,$AttrQ[1],$IndxCTimeFromParentCurrentArr,$IndxATimeFromParentCurrentArr,$IndxMTimeFromParentCurrentArr,$IndxRTimeFromParentCurrentArr,$IndxFileNameFromParentCurrentArr,$IndxMFTReferenceFromParentCurrentArr,$IndxMFTReferenceOfParentFromParentCurrentArr
 Global $IndxEntryNumberArr[1],$IndxMFTReferenceArr[1],$IndxMFTRefSeqNoArr[1],$IndxMFTReferenceOfParentArr[1],$IndxMFTParentRefSeqNoArr[1],$IndxCTimeArr[1],$IndxATimeArr[1],$IndxMTimeArr[1],$IndxRTimeArr[1],$IndxFileNameArr[1]
 ;Global $IndxEntryNumberArr[1],$IndxMFTReferenceArr[1],$IndxMFTRefSeqNoArr[1],$IndxIndexFlagsArr[1],$IndxMFTReferenceOfParentArr[1],$IndxMFTParentRefSeqNoArr[1],$IndxCTimeArr[1],$IndxATimeArr[1],$IndxMTimeArr[1],$IndxRTimeArr[1],$IndxAllocSizeArr[1],$IndxRealSizeArr[1],$IndxFileFlagsArr[1],$IndxFileNameArr[1],$IndxSubNodeVCNArr[1],$IndxNameSpaceArr[1]
-Global $IndxEntryNumberArr2[1],$IndxMFTReferenceArr2[1],$IndxFileNameArr2[1],$ShadowModifyMftArr[1],$ShadowModifyIndxArr[1],$ShadowModifyParentMftArr[1],$RawOffsetIndxArray[1], $RawOffsetOIndexArray[1], $RawOffsetRIndexArray[1]
+Global $IndxEntryNumberArr2[1],$IndxMFTReferenceArr2[1],$IndxFileNameArr2[1],$ShadowModifyMftArr[1],$ShadowModifyIndxArr[1],$ShadowModifyParentMftArr[1],$RawOffsetIndxArray[1], $RawOffsetOIndexArray[1], $RawOffsetRIndexArray[1], $RawOffsetAttrDefArray[1]
 Global $IRArr[12][2],$IndxArr[20][2],$InfoArrShadowMainTarget[3],$InfoArrShadowParent[3],$NewTimestampShifted,$IRTimestampsArray[1][4],$DummyVar=0,$IsCurrentIndxOfParent=0,$DoIndxOffsetArray=0
 Global $ShadowPath = "System Volume Information\", $ShadowGuid = "{3808876b-c176-4e48-b7ae-04046e6cc752}", $GlobalShadowArray[1][8], $GlobalShadowFileCounter=0, $ShadowPathResolved, $FromHarddiskVolumeShadowCopyXArr[15][1],$INDX_Record_Size=4096
 Global $DateTimeFormat = 6 ; YYYY-MM-DD HH:MM:SS:MSMSMS:NSNSNSNS = 2007-08-18 08:15:37:733:1234
@@ -74,7 +76,7 @@ Global Const $tagUNICODESTRING = "ushort Length;ushort MaximumLength;ptr Buffer"
 Global $Timerstart = TimerInit()
 
 ConsoleWrite("Starting PowerMft by Joakim Schicht" & @CRLF)
-ConsoleWrite("Version 1.0.0.0" & @CRLF & @CRLF)
+ConsoleWrite("Version 1.0.0.1" & @CRLF & @CRLF)
 
 If Not $cmdline[0] Then
 	ConsoleWrite("Error: Missing parameters" & @CRLF)
@@ -134,6 +136,34 @@ EndIf
 
 ;Start write
 ConsoleWrite("Start patching NTFS" & @CRLF & @CRLF)
+
+;Check the attribute definitions in $AttrDef file
+If $InfoArrShadowMainTarget[0] = 4 And $GlobalAttrDefFlag Then
+	$RetRec = _FindFileMFTRecord($TargetDrive,4)
+	If Not IsArray($RetRec) Then
+		ConsoleWrite("Error: Could not locate $AttrDef." & @CRLF)
+	Else
+		ConsoleWrite(@CRLF & "Parsing $AttrDef" & @CRLF)
+		If _Preparse_AttrDef($TargetDrive,$RetRec[0],$InfoArrShadowMainTarget[0]) Then
+			If IsArray($RawOffsetAttrDefArray) And Ubound($RawOffsetAttrDefArray) > 1 Then
+				ConsoleWrite(@CRLF & "Scanning non-resident $DATA of $AttrDef" & @CRLF)
+;				_ArrayDisplay($RawOffsetAttrDefArray,"$RawOffsetAttrDefArray")
+				For $i = 1 To UBound($RawOffsetAttrDefArray)-1
+					ConsoleWrite(@CRLF & "Trying volume offset 0x" & Hex(Int($RawOffsetAttrDefArray[$i][0])) & @CRLF)
+					If (_RawModAttrDef($RawOffsetAttrDefArray[$i][0],$RawOffsetAttrDefArray[$i][4],$RawOffsetAttrDefArray[$i][2],$InfoArrShadowMainTarget[0])) Then
+						ConsoleWrite("Success patching the non-resident $DATA in $AttrDef" & @CRLF)
+					EndIf
+				Next
+			Else
+				ConsoleWrite("There was no $DATA attribute in $AttrDef to patch" & @CRLF)
+			EndIf
+		Else
+			ConsoleWrite("Error parsing $AttrDef" & @CRLF)
+		EndIf
+	EndIf
+EndIf
+
+
 ConsoleWrite("Trying volume offset 0x" & Hex(Int($InfoArrShadowMainTarget[2])) & @CRLF)
 _RawModMft($InfoArrShadowMainTarget[2],$InfoArrShadowMainTarget[0])
 
@@ -203,6 +233,8 @@ If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Then
 		EndIf
 	EndIf
 EndIf
+
+
 
 ;Close existing handle to volume
 _WinAPI_CloseHandle($hDisk)
@@ -2596,6 +2628,7 @@ Func _GetAttributeEntry($TargetDevice,$Entry)
 		EndIf
 		$DataRun = StringMid($Entry,$RunListOffset*2+1,(StringLen($Entry)-$RunListOffset)*2)
 ;		ConsoleWrite("$DataRun = " & $DataRun & @crlf)
+		$CoreAttributeSize = $ATTRIBUTE_HEADER_RealSize
 	ElseIf $ATTRIBUTE_HEADER_NonResidentFlag = '00' Then
 		$ATTRIBUTE_HEADER_LengthOfAttribute = StringMid($Entry,33,8)
 ;		ConsoleWrite("$ATTRIBUTE_HEADER_LengthOfAttribute = " & $ATTRIBUTE_HEADER_LengthOfAttribute & @crlf)
@@ -2609,7 +2642,9 @@ Func _GetAttributeEntry($TargetDevice,$Entry)
 		$ATTRIBUTE_HEADER_Padding = StringMid($Entry,47,2)
 		$DataRun = StringMid($Entry,$ATTRIBUTE_HEADER_OffsetToAttribute*2+1,$ATTRIBUTE_HEADER_LengthOfAttribute*2)
 ;		ConsoleWrite("$DataRun = " & $DataRun & @crlf)
+		$CoreAttributeSize = $ATTRIBUTE_HEADER_LengthOfAttribute
 	EndIf
+
 ; Possible continuation
 ;	For $i = 1 To UBound($DataQ) - 1
 	For $i = 1 To 1
@@ -2695,11 +2730,12 @@ Func _GetAttributeEntry($TargetDevice,$Entry)
 ;							_DoNormalAttribute($hFile, $tBuffer)
 ;							Local $nBytes
 							$FileSize = $ATTRIBUTE_HEADER_RealSize
-							Local $TestArray[UBound($RUN_VCN)][4]
+							Local $TestArray[UBound($RUN_VCN)][5]
 							$TestArray[0][0] = "Offset"
 							$TestArray[0][1] = "Bytes Accumulated"
 							$TestArray[0][2] = "Bytes per Run"
 							$TestArray[0][3] = "Sectors per Run"
+							$TestArray[0][4] = "Total size of attribute"
 							For $s = 1 To UBound($RUN_VCN)-1
 								;An attempt at preparing for INDX modification
 								$TestArray[$s][0] = $RUN_VCN[$s]*$BytesPerCluster
@@ -2748,7 +2784,19 @@ Func _GetAttributeEntry($TargetDevice,$Entry)
 	$CoreAttributeArr[0] = $CoreAttribute
 	$CoreAttributeArr[1] = $ATTRIBUTE_HEADER_Name
 
-	If $IsReparseR And $ATTRIBUTE_HEADER_Name = "$R" Then
+	If $IsAttrDef Then
+		Global $RawOffsetAttrDefArray
+		$RawOffsetAttrDefArray = $TestArray
+		For $i = 1 To UBound($RawOffsetAttrDefArray)-1
+			If $i = 1 Then
+				$RawOffsetAttrDefArray[$i][2] = $RawOffsetAttrDefArray[$i][1]
+			Else
+				$RawOffsetAttrDefArray[$i][2] = $RawOffsetAttrDefArray[$i][1] - $RawOffsetAttrDefArray[$i-1][1]
+			EndIf
+			$RawOffsetAttrDefArray[$i][3] = $RawOffsetAttrDefArray[$i][2]/512
+			$RawOffsetAttrDefArray[$i][4] = $CoreAttributeSize
+		Next
+	ElseIf $IsReparseR And $ATTRIBUTE_HEADER_Name = "$R" Then
 		Global $RawOffsetRIndexArray
 		$RawOffsetRIndexArray = $TestArray
 		For $i = 1 To UBound($RawOffsetRIndexArray)-1
@@ -2758,6 +2806,7 @@ Func _GetAttributeEntry($TargetDevice,$Entry)
 				$RawOffsetRIndexArray[$i][2] = $RawOffsetRIndexArray[$i][1] - $RawOffsetRIndexArray[$i-1][1]
 			EndIf
 			$RawOffsetRIndexArray[$i][3] = $RawOffsetRIndexArray[$i][2]/512
+			$RawOffsetRIndexArray[$i][4] = $CoreAttributeSize
 		Next
 	ElseIf $IsObjIdO And $ATTRIBUTE_HEADER_Name = "$O" Then
 		Global $RawOffsetOIndexArray
@@ -2769,6 +2818,7 @@ Func _GetAttributeEntry($TargetDevice,$Entry)
 				$RawOffsetOIndexArray[$i][2] = $RawOffsetOIndexArray[$i][1] - $RawOffsetOIndexArray[$i-1][1]
 			EndIf
 			$RawOffsetOIndexArray[$i][3] = $RawOffsetOIndexArray[$i][2]/512
+			$RawOffsetOIndexArray[$i][4] = $CoreAttributeSize
 		Next
 	ElseIf $IsCurrentIndxOfParent And $ATTRIBUTE_HEADER_Name = "$I30" Then ;Generate the offset array for the INDX of the parent, if required
 		$RawOffsetIndxArray = $TestArray
@@ -2779,6 +2829,7 @@ Func _GetAttributeEntry($TargetDevice,$Entry)
 				$RawOffsetIndxArray[$i][2] = $RawOffsetIndxArray[$i][1] - $RawOffsetIndxArray[$i-1][1]
 			EndIf
 			$RawOffsetIndxArray[$i][3] = $RawOffsetIndxArray[$i][2]/512
+			$RawOffsetIndxArray[$i][4] = $CoreAttributeSize
 		Next
 ;		_ArrayDisplay($RawOffsetIndxArray,"$RawOffsetIndxArray")
 		$IsCurrentIndxOfParent=0
@@ -7116,9 +7167,10 @@ Func _ParseParentIndexRoot2($TargetDevice,$TargetRef,$Entry,$IR_Offset,$IR_Size)
 EndFunc
 
 Func _PrintHelp()
-	ConsoleWrite("PowerMft.exe /Target:TargetPath /Verbose:{0|1} /HdrVariable:{value} /SIVariable:{value} /FNVariable:{value}" & @CRLF)
+	ConsoleWrite("PowerMft.exe /Target:TargetPath /Verbose:{0|1} /HdrVariable:{value} /SIVariable:{value} /FNVariable:{value} /ADVariable:{value}" & @CRLF)
 	ConsoleWrite("	/Target can be any file or directory, and may be specified as filename with full path or Volume+MftRef." & @CRLF)
-	ConsoleWrite("	/Verbose is verbosity of output flag. Set to 0 or 1. Default 0." & @CRLF & @CRLF)
+	ConsoleWrite("	/Verbose is verbosity of output flag. Set to 0 or 1. Default 0." & @CRLF)
+	ConsoleWrite(@CRLF)
 	ConsoleWrite("	/HdrVariable can be any combination of variables within the MFT record header out of the following:" & @CRLF)
 	ConsoleWrite("	/HdrSignature is the record signature, usually FILE (46494c45). (4 bytes)" & @CRLF)
 	ConsoleWrite("	/HdrUSAOffset is the offset to the usa. (2 bytes)" & @CRLF)
@@ -7136,7 +7188,8 @@ Func _PrintHelp()
 	ConsoleWrite("	/HdrBaseRecordSequenceNo is the sequence number of the base record. (2 bytes)" & @CRLF)
 	ConsoleWrite("	/HdrNextAttributeId is the id of the next attribute. (2 bytes)" & @CRLF)
 	ConsoleWrite("	/HdrPadding is a 2 byte padding. (2 bytes)" & @CRLF)
-	ConsoleWrite("	/HdrMftRecordNumber is the MFT record number. (8 bytes)" & @CRLF & @CRLF)
+	ConsoleWrite("	/HdrMftRecordNumber is the MFT record number. (8 bytes)" & @CRLF)
+	ConsoleWrite(@CRLF)
 	ConsoleWrite("	/SIVariable can be any combination of variables within the $STANDARD_INFORMATION attribute of the following:" & @CRLF)
 	ConsoleWrite("	/SICTime is the timestamp File Create Time. (8 bytes)" & @CRLF)
 	ConsoleWrite("	/SIATime is the timestamp File Modified Time. (8 bytes)" & @CRLF)
@@ -7149,7 +7202,8 @@ Func _PrintHelp()
 	ConsoleWrite("	/SIOwnerID is the Owner Id. (4 bytes)" & @CRLF)
 	ConsoleWrite("	/SISecurityID is the Security Id key into the index of $SII and $SDS. (4 bytes)" & @CRLF)
 	ConsoleWrite("	/SIQuotaCharged is the number of bytes this file accupy for user quota if quota enabled. 0 means disabled. (8 bytes)" & @CRLF)
-	ConsoleWrite("	/SIUSN is the Update Sequence Number in $UsnJrnl. (8 bytes)" & @CRLF & @CRLF)
+	ConsoleWrite("	/SIUSN is the Update Sequence Number in $UsnJrnl. (8 bytes)" & @CRLF)
+	ConsoleWrite(@CRLF)
 	ConsoleWrite("	/FNVariable can be any combination of variables within the $FILE_NAME attribute of the following:" & @CRLF)
 	ConsoleWrite("	/FNParentReferenceNo is the MFT number of the parent. (6 bytes)" & @CRLF)
 	ConsoleWrite("	/FNParentSequenceNo is the sequence number of the MFT of parent. (2 bytes)" & @CRLF)
@@ -7166,6 +7220,16 @@ Func _PrintHelp()
 	ConsoleWrite("	/FNFilename is the file name. (FNNameLength bytes)" & @CRLF)
 	ConsoleWrite("	/FNForceFileName is a boolean value for forcing filename modification. See readme.txt" & @CRLF)
 	ConsoleWrite("	/FNCoreFileName is for specifying the core filename when dealing with certain invalid filenames. See readme.txt" & @CRLF)
+	ConsoleWrite(@CRLF)
+	ConsoleWrite("	/ADVariable can be some combination of variables from the Attribute Definition Table in $AttrDef:" & @CRLF)
+	ConsoleWrite("	/ADExistingAttrName is for Attribute Name in attribute definitions in $AttrDef." & @CRLF)
+	ConsoleWrite("	/ADAttrName is for Attribute Name in attribute definitions in $AttrDef." & @CRLF)
+	ConsoleWrite("	/ADAttrCode is for Attribute Code in attribute definitions in $AttrDef." & @CRLF)
+	ConsoleWrite("	/ADDisplayRule is for Display Rule in attribute definitions in $AttrDef." & @CRLF)
+	ConsoleWrite("	/ADCollationRule is for Collation Rule in attribute definitions in $AttrDef." & @CRLF)
+	ConsoleWrite("	/ADFlags is for Flags in attribute definitions in $AttrDef. See readme.txt." & @CRLF)
+	ConsoleWrite("	/ADMinLength is for Attribute Minimum length/size in attribute definitions in $AttrDef." & @CRLF)
+	ConsoleWrite("	/ADMaxLength is for Attribute Maximum length/size in attribute definitions in $AttrDef." & @CRLF)
 	ConsoleWrite(@CRLF)
 	ConsoleWrite("Examples:" & @CRLF & @CRLF)
 	ConsoleWrite("PowerMft.exe /Target:c:\bootmgr /Verbose:1" & @CRLF)
@@ -7190,7 +7254,10 @@ Func _PrintHelp()
 	ConsoleWrite('(Change the filename of D:\file.ext to the invisible file "D:\        " with a filename consisting of 8 spaces in $FILE_NAME and the $I30 index. Just for fun.)' & @CRLF & @CRLF)
 	ConsoleWrite('PowerMft.exe /Target:"D:\        " /FNCoreFileName:"        " /FNFileName:file.ext' & @CRLF)
 	ConsoleWrite('(Rename back the invisible file with the 8 spaces to D:\file.ext in $FILE_NAME and the $I30 index.)' & @CRLF & @CRLF)
-
+	ConsoleWrite('PowerMft.exe /Target:D:4 /ADExistingAttrName:$REPARSE_POINT /ADAttrName:$CHKDSK_UNHAPPY' & @CRLF)
+	ConsoleWrite('(Access the Attribute Definition Table in $AttrDef and change the name of $REPARSE_POINT to $CHKDSK_UNHAPPY)' & @CRLF & @CRLF)
+	ConsoleWrite('PowerMft.exe /Target:D:4 /ADAttrName:$CHKDSK_UNHAPPY /ADAttrCode:272 /ADDisplayRule:0 /ADCollationRule:0 /ADFlags:128 /ADMinLength:0 /ADMaxLength:16384' & @CRLF)
+	ConsoleWrite('(Access the Attribute Definition Table in $AttrDef and create the new attribute $CHKDSK_UNHAPPY)' & @CRLF & @CRLF)
 EndFunc
 
 Func _ValidateInput()
@@ -7202,6 +7269,8 @@ Func _ValidateInput()
 	Global $DoSICTime,$DoSIATime,$DoSIMTime,$DoSIRTime,$DoSIFilePermission,$DoSIMaxVersions,$DoSIVersionNumber,$DoSIClassID,$DoSIOwnerID,$DoSISecurityID,$DoSIQuotaCharged,$DoSIUSN
 	Global $NewFNParentReferenceNo,$NewFNParentSequenceNo,$NewFNCTime,$NewFNATime,$NewFNMTime,$NewFNRTime,$NewFNAllocSize,$NewFNRealSize,$NewFNFlags,$NewFNUnknownEaReparse,$NewFNNameLength,$NewFNNameSpace,$NewFNFilename
 	Global $DoFNParentReferenceNo,$DoFNParentSequenceNo,$DoFNCTime,$DoFNATime,$DoFNMTime,$DoFNRTime,$DoFNAllocSize,$DoFNRealSize,$DoFNFlags,$DoFNUnknownEaReparse,$DoFNNameLength,$DoFNNameSpace,$DoFNFilename
+;	Global $NewAttrDefExistingAttrName,$NewAttrDefAttrName,$NewAttrDefAttrCode,$NewAttrDefDisplayRule,$NewAttrDefCollationRule,$NewAttrDefFlags,$NewAttrDefMinLength,$NewAttrDefMaxLength
+;	Global $DoAttrDefExistingAttrName,$DoAttrDefAttrName,$DoAttrDefAttrCode,$DoAttrDefDisplayRule,$DoAttrDefCollationRule,$DoAttrDefFlags,$DoAttrDefMinLength,$DoAttrDefMaxLength
 	Local $Verbose
 	If $cmdline[0] < 1 Then
 		ConsoleWrite("Error: Wrong number of parameters" & @CRLF)
@@ -7261,6 +7330,16 @@ Func _ValidateInput()
 		If StringLeft($cmdline[$i],12) = "/FNFileName:" Then $NewFNFilename = StringMid($cmdline[$i],13)
 		If StringLeft($cmdline[$i],17) = "/FNForceFileName:" Then $FNForceFileName = Int(StringMid($cmdline[$i],18))
 		If StringLeft($cmdline[$i],16) = "/FNCoreFileName:" Then $FNCoreFileName = StringMid($cmdline[$i],17)
+		;$AttrDef
+		If StringLeft($cmdline[$i],20) = "/ADExistingAttrName:" Then $NewAttrDefExistingAttrName = StringMid($cmdline[$i],21)
+		If StringLeft($cmdline[$i],12) = "/ADAttrName:" Then $NewAttrDefAttrName = StringMid($cmdline[$i],13)
+		If StringLeft($cmdline[$i],12) = "/ADAttrCode:" Then $NewAttrDefAttrCode = StringMid($cmdline[$i],13)
+		If StringLeft($cmdline[$i],15) = "/ADDisplayRule:" Then $NewAttrDefDisplayRule = Int(StringMid($cmdline[$i],16))
+		If StringLeft($cmdline[$i],17) = "/ADCollationRule:" Then $NewAttrDefCollationRule = Int(StringMid($cmdline[$i],18))
+		If StringLeft($cmdline[$i],9) = "/ADFlags:" Then $NewAttrDefFlags = Int(StringMid($cmdline[$i],10))
+		If StringLeft($cmdline[$i],13) = "/ADMinLength:" Then $NewAttrDefMinLength = Int(StringMid($cmdline[$i],14))
+		If StringLeft($cmdline[$i],13) = "/ADMaxLength:" Then $NewAttrDefMaxLength = Int(StringMid($cmdline[$i],14))
+
 	Next
 
 	If $TargetPath Then
@@ -7724,6 +7803,62 @@ Func _ValidateInput()
 			$FNForceFileName = ""
 		EndIf
 	EndIf
+
+	;$AttrDef:
+	If StringLen($NewAttrDefExistingAttrName) > 0 Then
+		ConsoleWrite("$NewAttrDefExistingAttrName: " & $NewAttrDefExistingAttrName & @CRLF)
+		$DoAttrDefExistingAttrName = 1
+	EndIf
+
+	If StringLen($NewAttrDefAttrName) > 0 Then
+		ConsoleWrite("$NewAttrDefAttrName: " & $NewAttrDefAttrName & @CRLF)
+		$DoAttrDefAttrName = 1
+		Local $TmpName
+		$LocalNameArray = StringSplit($NewAttrDefAttrName,"")
+		For $i = 1 To $LocalNameArray[0]
+			$TmpName &= _SwapEndian(Hex(Asc($LocalNameArray[$i]),4))
+		Next
+		;+ padd with 00's to 160 bytes
+		$PaddingLength = 128-($LocalNameArray[0]*2)
+		;$PaddingLength = $PaddingLength*4
+		For $i = 1 To $PaddingLength
+			$TmpName &= '00'
+		Next
+		$NewAttrDefAttrName = $TmpName
+	EndIf
+
+	If StringLen($NewAttrDefAttrCode) > 0 Then
+		ConsoleWrite("$NewAttrDefAttrCode: " & $NewAttrDefAttrCode & @CRLF)
+		$DoAttrDefAttrCode = 1
+		$NewAttrDefAttrCode = _SwapEndian(Hex($NewAttrDefAttrCode,8))
+	EndIf
+	If StringLen($NewAttrDefDisplayRule) > 0 Then
+		ConsoleWrite("$NewAttrDefDisplayRule: " & $NewAttrDefDisplayRule & @CRLF)
+		$DoAttrDefDisplayRule = 1
+		$NewAttrDefDisplayRule = _SwapEndian(Hex($NewAttrDefDisplayRule,8))
+	EndIf
+	If StringLen($NewAttrDefCollationRule) > 0 Then
+		ConsoleWrite("$NewAttrDefCollationRule: " & $NewAttrDefCollationRule & @CRLF)
+		$DoAttrDefCollationRule = 1
+		$NewAttrDefCollationRule = _SwapEndian(Hex($NewAttrDefCollationRule,8))
+	EndIf
+	If StringLen($NewAttrDefFlags) > 0 Then
+		ConsoleWrite("$NewAttrDefFlags: " & $NewAttrDefFlags & @CRLF)
+		$DoAttrDefFlags = 1
+		$NewAttrDefFlags = _SwapEndian(Hex($NewAttrDefFlags,8))
+	EndIf
+	If StringLen($NewAttrDefMinLength) > 0 Then
+		ConsoleWrite("$NewAttrDefMinLength: " & $NewAttrDefMinLength & @CRLF)
+		$DoAttrDefMinLength = 1
+		$NewAttrDefMinLength = _SwapEndian(Hex($NewAttrDefMinLength,16))
+	EndIf
+	If StringLen($NewAttrDefMaxLength) > 0 Then
+		ConsoleWrite("$NewAttrDefMaxLength: " & $NewAttrDefMaxLength & @CRLF)
+		$DoAttrDefMaxLength = 1
+		$NewAttrDefMaxLength = _SwapEndian(Hex($NewAttrDefMaxLength,16))
+	EndIf
+	$GlobalAttrDefFlag = $DoAttrDefAttrName+$DoAttrDefAttrCode+$DoAttrDefDisplayRule+$DoAttrDefCollationRule+$DoAttrDefFlags+$DoAttrDefMinLength+$DoAttrDefMaxLength
+
 	ConsoleWrite(@CRLF)
 
 EndFunc
@@ -9122,4 +9257,403 @@ Func _GetReparseType($ReparseType)
 		Case Else
 			Return 'UNKNOWN(' & $ReparseType & ')'
 	EndSelect
+EndFunc
+
+Func _DecodeAttributeFlags($AFinput)
+	Local $AFoutput = ""
+	If $AFinput = 0x0000 Then Return 'ZERO'
+	;This flag is set if the attribute may be indexed:
+	If BitAND($AFinput, 0x0002) Then $AFoutput &= 'INDEXABLE+'
+	;This flag is set if the attribute may occur more than once, such as is allowed for the File Name attribute:
+	If BitAND($AFinput, 0x0004) Then $AFoutput &= 'DUPLICATES_ALLOWED+'
+	;This flag is set if the value of the attribute may not be entirely null, i.e., all binary 0's:
+	If BitAND($AFinput, 0x0008) Then $AFoutput &= 'MAY_NOT_BE_NULL+'
+	;This attribute must be indexed, and no two attributes may exist with the same value in the same file record segment:
+	If BitAND($AFinput, 0x0010) Then $AFoutput &= 'MUST_BE_INDEXED+'
+	;This attribute must be named, and no two attributes may exist with the same name in the same file record segment:
+	If BitAND($AFinput, 0x0020) Then $AFoutput &= 'MUST_BE_NAMED+'
+	;This attribute must be in the Resident Form
+	If BitAND($AFinput, 0x0040) Then $AFoutput &= 'MUST_BE_RESIDENT+'
+	;Modifications to this attribute should be logged even if the attribute is nonresident:
+	If BitAND($AFinput, 0x0080) Then $AFoutput &= 'LOG_NONRESIDENT+'
+	$AFoutput = StringTrimRight($AFoutput, 1)
+	Return $AFoutput
+EndFunc
+
+Func _ResolveAttributeType($input)
+	Select
+		Case $input = "1000"
+			Return "$STANDARD_INFORMATION"
+		Case $input = "2000"
+			Return "$ATTRIBUTE_LIST"
+		Case $input = "3000"
+			Return "$FILE_NAME"
+		Case $input = "4000"
+			Return "$OBJECT_ID"
+		Case $input = "5000"
+			Return "$SECURITY_DESCRIPTOR"
+		Case $input = "6000"
+			Return "$VOLUME_NAME"
+		Case $input = "7000"
+			Return "$VOLUME_INFORMATION"
+		Case $input = "8000"
+			Return "$DATA"
+		Case $input = "9000"
+			Return "$INDEX_ROOT"
+		Case $input = "a000"
+			Return "$INDEX_ALLOCATION"
+		Case $input = "b000"
+			Return "$BITMAP"
+		Case $input = "c000"
+			Return "$REPARSE_POINT"
+		Case $input = "d000"
+			Return "$EA_INFORMATION"
+		Case $input = "e000"
+			Return "$EA"
+		Case $input = "0001"
+			Return "$LOGGED_UTILITY_STREAM"
+		Case Else
+			Return "UNKNOWN"
+	EndSelect
+EndFunc
+
+Func _Preparse_AttrDef($TargetDevice,$DiskOffset,$TargetRef)
+	Local $nBytes,$hFile,$TmpOffset,$tBuffer1,$read,$MFTEntry,$IndexRootPresent=0,$IndexAllocationPresent=0,$DataPresent=0
+	Local $UpdSeqArrOffset,$UpdSeqArrSize,$UpdSeqArr
+
+	$AttrDefAll = $DoAttrDefAttrName+$DoAttrDefAttrCode+$DoAttrDefDisplayRule+$DoAttrDefCollationRule+$DoAttrDefFlags+$DoAttrDefMinLength+$DoAttrDefMaxLength
+	If Not (($DoAttrDefExistingAttrName And $AttrDefAll>0) Or ($DoAttrDefExistingAttrName=0 And $AttrDefAll=7)) Then
+		ConsoleWrite("Error: Incorrect combination of AttrDef parameters" & @CRLF)
+		ConsoleWrite("$DoAttrDefExistingAttrName: " & $DoAttrDefExistingAttrName & @CRLF)
+		ConsoleWrite("$AttrDefAll: " & $AttrDefAll & @CRLF)
+		Return 0
+	EndIf
+
+;	ConsoleWrite("$DiskOffset: " & $DiskOffset & @crlf)
+	$hFile = _WinAPI_CreateFile("\\.\" & $TargetDevice,2,6,7)
+	If Not $hFile then
+		ConsoleWrite("Error in CreateFile in function _Preparse_AttrDef(): " & _WinAPI_GetLastErrorMessage() & " for: " & "\\.\" & $TargetDevice & @crlf)
+		Return 0
+	EndIf
+	_WinAPI_SetFilePointerEx($hFile, $DiskOffset)
+;	$TmpOffset = DllCall('kernel32.dll', 'int', 'SetFilePointerEx', 'ptr', $hFile, 'int64', 0, 'int64*', 0, 'dword', 1)
+	;ConsoleWrite("Current offset before writing: " & $TmpOffset[3] & @CRLF)
+	$tBuffer1 = DllStructCreate("byte[" & $MFT_Record_Size & "]")
+	$read = _WinAPI_ReadFile($hFile, DllStructGetPtr($tBuffer1), $MFT_Record_Size, $nBytes)
+	If $read = 0 then
+		ConsoleWrite("Error in ReadFile in function _Preparse_AttrDef(): " & _WinAPI_GetLastErrorMessage() & " for: " & "\\.\" & $TargetDevice & @crlf)
+		Return 0
+	EndIf
+	$MFTEntry = DllStructGetData($tBuffer1,1)
+;	If StringLeft($MFTEntry,2) = "0x" Then $MFTEntry = StringTrimLeft($MFTEntry,2)
+	_WinAPI_CloseHandle($hFile)
+;	ConsoleWrite("Unfixed MFT record:" & @crlf)
+;	ConsoleWrite(_HexEncode($MFTEntry) & @crlf)
+
+	$UpdSeqArrOffset = Dec(_SwapEndian(StringMid($MFTEntry,11,4)))
+	$UpdSeqArrSize = Dec(_SwapEndian(StringMid($MFTEntry,15,4)))
+	$UpdSeqArr = StringMid($MFTEntry,3+($UpdSeqArrOffset*2),$UpdSeqArrSize*2*2)
+;	ConsoleWrite("$UpdSeqArrOffset: " & $UpdSeqArrOffset & @crlf)
+;	ConsoleWrite("$UpdSeqArrSize: " & $UpdSeqArrSize & @crlf)
+;	ConsoleWrite("$UpdSeqArr: " & $UpdSeqArr & @crlf)
+	If $MFT_Record_Size = 1024 Then
+		Local $UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
+		Local $UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
+		Local $UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
+		Local $RecordEnd1 = StringMid($MFTEntry,1023,4)
+		Local $RecordEnd2 = StringMid($MFTEntry,2047,4)
+		If $UpdSeqArrPart0 <> $RecordEnd1 OR $UpdSeqArrPart0 <> $RecordEnd2 Then
+;			_DebugOut("The record failed Fixup", $MFTEntry)
+			ConsoleWrite("The INDX record failed Fixup")
+			ConsoleWrite(_HexEncode($MFTEntry) & @CRLF)
+			Return 0
+		EndIf
+		$MFTEntry = StringMid($MFTEntry,1,1022) & $UpdSeqArrPart1 & StringMid($MFTEntry,1027,1020) & $UpdSeqArrPart2
+	ElseIf $MFT_Record_Size = 4096 Then
+		Local $UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
+		Local $UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
+		Local $UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
+		Local $UpdSeqArrPart3 = StringMid($UpdSeqArr,13,4)
+		Local $UpdSeqArrPart4 = StringMid($UpdSeqArr,17,4)
+		Local $UpdSeqArrPart5 = StringMid($UpdSeqArr,21,4)
+		Local $UpdSeqArrPart6 = StringMid($UpdSeqArr,25,4)
+		Local $UpdSeqArrPart7 = StringMid($UpdSeqArr,29,4)
+		Local $UpdSeqArrPart8 = StringMid($UpdSeqArr,33,4)
+		Local $RecordEnd1 = StringMid($MFTEntry,1023,4)
+		Local $RecordEnd2 = StringMid($MFTEntry,2047,4)
+		Local $RecordEnd3 = StringMid($MFTEntry,3071,4)
+		Local $RecordEnd4 = StringMid($MFTEntry,4095,4)
+		Local $RecordEnd5 = StringMid($MFTEntry,5119,4)
+		Local $RecordEnd6 = StringMid($MFTEntry,6143,4)
+		Local $RecordEnd7 = StringMid($MFTEntry,7167,4)
+		Local $RecordEnd8 = StringMid($MFTEntry,8191,4)
+		If $UpdSeqArrPart0 <> $RecordEnd1 OR $UpdSeqArrPart0 <> $RecordEnd2 OR $UpdSeqArrPart0 <> $RecordEnd3 OR $UpdSeqArrPart0 <> $RecordEnd4 OR $UpdSeqArrPart0 <> $RecordEnd5 OR $UpdSeqArrPart0 <> $RecordEnd6 OR $UpdSeqArrPart0 <> $RecordEnd7 OR $UpdSeqArrPart0 <> $RecordEnd8 Then
+;			_DebugOut("The record failed Fixup", $MFTEntry)
+			ConsoleWrite("The INDX record failed Fixup")
+			ConsoleWrite(_HexEncode($MFTEntry) & @CRLF)
+			Return 0
+		Else
+			$MFTEntry =  StringMid($MFTEntry,1,1022) & $UpdSeqArrPart1 & StringMid($MFTEntry,1027,1020) & $UpdSeqArrPart2 & StringMid($MFTEntry,2051,1020) & $UpdSeqArrPart3 & StringMid($MFTEntry,3075,1020) & $UpdSeqArrPart4 & StringMid($MFTEntry,4099,1020) & $UpdSeqArrPart5 & StringMid($MFTEntry,5123,1020) & $UpdSeqArrPart6 & StringMid($MFTEntry,6147,1020) & $UpdSeqArrPart7 & StringMid($MFTEntry,7171,1020) & $UpdSeqArrPart8
+		EndIf
+	EndIf
+
+	If $VerboseOn Then
+		ConsoleWrite("Original MFT record of $AttrDef:" & @crlf)
+		ConsoleWrite(_HexEncode($MFTEntry) & @crlf)
+	EndIf
+
+	$HEADER_RecordRealSize = Dec(_SwapEndian(StringMid($MFTEntry,51,8)),2)
+	If $UpdSeqArrOffset = 48 Then
+		$HEADER_MFTREcordNumber = Dec(_SwapEndian(StringMid($MFTEntry,91,8)),2)
+	Else
+		$HEADER_MFTREcordNumber = "NT style"
+	EndIf
+	$Header_SequenceNo = Dec(_SwapEndian(StringMid($MFTEntry,35,4)))
+	$Header_HardLinkCount = Dec(_SwapEndian(StringMid($MFTEntry,39,4)))
+
+	$AttributeOffset = (Dec(StringMid($MFTEntry,43,2))*2)+3
+
+	While 1
+		$AttributeType = StringMid($MFTEntry,$AttributeOffset,8)
+		$AttributeSize = StringMid($MFTEntry,$AttributeOffset+8,8)
+		$AttributeSize = Dec(_SwapEndian($AttributeSize),2)
+;		ConsoleWrite("$AttributeType: " & $AttributeType & @CRLF)
+		Select
+			Case $AttributeType = $STANDARD_INFORMATION
+			Case $AttributeType = $ATTRIBUTE_LIST
+			Case $AttributeType = $FILE_NAME
+			Case $AttributeType = $OBJECT_ID
+			Case $AttributeType = $SECURITY_DESCRIPTOR
+			Case $AttributeType = $VOLUME_NAME
+			Case $AttributeType = $VOLUME_INFORMATION
+			Case $AttributeType = $DATA
+				If $HEADER_MFTREcordNumber = 4 Then
+					Global $IsAttrDef = 1
+					$DataPresent = 1
+					$CoreAttribute = _GetAttributeEntry($TargetDevice,StringMid($MFTEntry,$AttributeOffset,$AttributeSize*2))
+					$CoreAttributeChunk = $CoreAttribute[0]
+					$CoreAttributeName = $CoreAttribute[1]
+				EndIf
+			Case $AttributeType = $INDEX_ROOT
+			Case $AttributeType = $INDEX_ALLOCATION
+			Case $AttributeType = $BITMAP
+			Case $AttributeType = $REPARSE_POINT
+			Case $AttributeType = $EA_INFORMATION
+			Case $AttributeType = $EA
+			Case $AttributeType = $PROPERTY_SET
+			Case $AttributeType = $LOGGED_UTILITY_STREAM
+			Case $AttributeType = $ATTRIBUTE_END_MARKER
+				ExitLoop
+		EndSelect
+		$AttributeOffset += $AttributeSize*2
+	WEnd
+	If Not $DataPresent Then
+		ConsoleWrite("Error: No $DATA to patch in the $MFT record of $AttrDef" & @CRLF)
+		Return 0
+	Else
+		Return 1
+	EndIf
+EndFunc
+
+Func _RawModAttrDef($DiskOffset,$TotalAttributeSize,$ChunkSize,$TargetRef)
+	Local $AttrCounter=0, $StartOffset=3,$nBytes
+	Local $LocalAttrDef_AttributeNumberArr[1][2],$LocalAttrDef_AttributeNameArr[1][2],$LocalAttrDef_AttributeCodeArr[1][2],$LocalAttrDef_DisplayRuleArr[1][2],$LocalAttrDef_CollationRuleArr[1][2]
+	Local $LocalAttrDef_FlagsArr[1][2],$LocalAttrDef_MinLengthArr[1][2],$LocalAttrDef_MaxLengthArr[1][2]
+
+;	ConsoleWrite("_RawModAttrDef():" & @crlf)
+
+	;Need to make sure it is aligned to sector size at buffer size
+	If $ChunkSize > $TotalAttributeSize Then
+		$ChunkSize = $TotalAttributeSize
+	EndIf
+
+	Local $hFile = _WinAPI_CreateFile("\\.\" & $TargetDrive,2,6,7)
+	If Not $hFile then
+		ConsoleWrite("Error in CreateFile in function _RawModAttrDef(): " & _WinAPI_GetLastErrorMessage() & " for: " & "\\.\" & $TargetDrive & @crlf)
+		Return 0
+	EndIf
+	_WinAPI_SetFilePointerEx($hFile, $DiskOffset)
+;	$TmpOffset = DllCall('kernel32.dll', 'int', 'SetFilePointerEx', 'ptr', $hFile, 'int64', 0, 'int64*', 0, 'dword', 1)
+	;ConsoleWrite("Current offset before writing: " & $TmpOffset[3] & @CRLF)
+	Local $tBuffer1 = DllStructCreate("byte[" & $ChunkSize & "]")
+	$read = _WinAPI_ReadFile($hFile, DllStructGetPtr($tBuffer1), $ChunkSize, $nBytes)
+	If $read = 0 then
+		ConsoleWrite("Error in ReadFile in function _RawModAttrDef(): " & _WinAPI_GetLastErrorMessage() & " for: " & "\\.\" & $TargetDrive & @crlf)
+		Return 0
+	EndIf
+	$InputData = DllStructGetData($tBuffer1,1)
+	_WinAPI_CloseHandle($hFile)
+
+	$InputDataSize = StringLen($InputData)-2
+;	ConsoleWrite("Original data:" & @crlf)
+;	ConsoleWrite(_HexEncode($InputData) & @crlf)
+
+	Do
+		$AttrCounter += 1
+		$AttrName = StringMid($InputData, $StartOffset, 256)
+		$AttrNameResolved = ""
+		For $i = 1 To 256 Step 4
+			$Char = StringMid($AttrName,$i,4)
+			If $Char = '0000' Then ExitLoop
+			$AttrNameResolved &= StringMid($Char,1,2)
+		Next
+		$AttrNameResolved = _HexToString($AttrNameResolved)
+
+		$AttrCode = StringMid($InputData, $StartOffset + 256, 8)
+		$AttrCodeResolved = _ResolveAttributeType(StringMid($AttrCode,1,4))
+;		If $AttrNameResolved <> $AttrCodeResolved Then
+;			ConsoleWrite("Error: Something wrong in $AttrDef" & @crlf)
+;			ExitLoop
+;		EndIf
+
+		$AttrDisplayRule = StringMid($InputData, $StartOffset + 264, 8)
+		$AttrDisplayRule = _SwapEndian($AttrDisplayRule)
+
+		$AttrCollationRule = StringMid($InputData, $StartOffset + 272, 8)
+		$AttrCollationRule = _SwapEndian($AttrCollationRule)
+
+		$AttrFlags = StringMid($InputData, $StartOffset + 280, 8)
+		$AttrFlags = _SwapEndian($AttrFlags)
+		$AttrFlagsResolved = _DecodeAttributeFlags("0x"&$AttrFlags)
+
+		$AttrMinLength = StringMid($InputData, $StartOffset + 288, 16)
+;		$AttrMinLength = Dec(_SwapEndian($AttrMinLength),2)
+		$AttrMinLength = "0x"&_SwapEndian($AttrMinLength)
+
+		$AttrMaxLength = StringMid($InputData, $StartOffset + 304, 16)
+;		$AttrMaxLength = Dec(_SwapEndian($AttrMaxLength),2)
+		$AttrMaxLength = "0x"&_SwapEndian($AttrMaxLength)
+		;Adjust array sizes
+		ReDim $LocalAttrDef_AttributeNumberArr[1+$AttrCounter][2]
+		ReDim $LocalAttrDef_AttributeNameArr[1+$AttrCounter][2]
+		Redim $LocalAttrDef_AttributeCodeArr[1+$AttrCounter][2]
+		ReDim $LocalAttrDef_DisplayRuleArr[1+$AttrCounter][2]
+		ReDim $LocalAttrDef_CollationRuleArr[1+$AttrCounter][2]
+		ReDim $LocalAttrDef_FlagsArr[1+$AttrCounter][2]
+		ReDim $LocalAttrDef_MinLengthArr[1+$AttrCounter][2]
+		ReDim $LocalAttrDef_MaxLengthArr[1+$AttrCounter][2]
+		;Offset
+		$LocalAttrDef_AttributeNameArr[$AttrCounter][0] = $StartOffset
+		$LocalAttrDef_AttributeCodeArr[$AttrCounter][0] = $StartOffset+256
+		$LocalAttrDef_DisplayRuleArr[$AttrCounter][0] = $StartOffset+264
+		$LocalAttrDef_CollationRuleArr[$AttrCounter][0] = $StartOffset+272
+		$LocalAttrDef_FlagsArr[$AttrCounter][0] = $StartOffset+280
+		$LocalAttrDef_MinLengthArr[$AttrCounter][0] = $StartOffset+288
+		$LocalAttrDef_MaxLengthArr[$AttrCounter][0] = $StartOffset+304
+		;Data
+		$LocalAttrDef_AttributeNumberArr[$AttrCounter][1] = $AttrCounter
+		$LocalAttrDef_AttributeNameArr[$AttrCounter][1] = $AttrNameResolved
+		$LocalAttrDef_AttributeCodeArr[$AttrCounter][1] = $AttrCode
+		$LocalAttrDef_DisplayRuleArr[$AttrCounter][1] = $AttrDisplayRule
+		$LocalAttrDef_CollationRuleArr[$AttrCounter][1] = $AttrCollationRule
+		$LocalAttrDef_FlagsArr[$AttrCounter][1] = $AttrFlags
+		$LocalAttrDef_MinLengthArr[$AttrCounter][1] = $AttrMinLength
+		$LocalAttrDef_MaxLengthArr[$AttrCounter][1] = $AttrMaxLength
+
+		$StartOffset += 160*2
+	Until $StartOffset >= $InputDataSize
+;	_ArrayDisplay($LocalAttrDef_AttributeNameArr,"$LocalAttrDef_AttributeNameArr")
+;	_ArrayDisplay($LocalAttrDef_AttributeCodeArr,"$LocalAttrDef_AttributeCodeArr")
+
+	$OutputData = $InputData
+
+	Local $WorkCounter=0,$AttrMatchCounter=0
+	If $DoAttrDefExistingAttrName Then ;Modify existing attribute definition
+		For $i = 1 To Ubound($LocalAttrDef_AttributeNumberArr)-1
+			If ($NewAttrDefExistingAttrName = $LocalAttrDef_AttributeNameArr[$i][1]) Then
+				$AttrMatchCounter += 1
+
+				If $DoAttrDefAttrName Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_AttributeNameArr[$i][0]-1) & $NewAttrDefAttrName & StringMid($OutputData,$LocalAttrDef_AttributeNameArr[$i][0]+256,$InputDataSize-256)
+				EndIf
+				If $DoAttrDefAttrCode Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_AttributeCodeArr[$i][0]-1) & $NewAttrDefAttrCode & StringMid($OutputData,$LocalAttrDef_AttributeCodeArr[$i][0]+(StringLen($NewAttrDefAttrCode)),$InputDataSize-$LocalAttrDef_AttributeCodeArr[$i][0])
+				EndIf
+				If $DoAttrDefDisplayRule Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_DisplayRuleArr[$i][0]-1) & $NewAttrDefDisplayRule & StringMid($OutputData,$LocalAttrDef_DisplayRuleArr[$i][0]+(StringLen($NewAttrDefDisplayRule)),$InputDataSize-$LocalAttrDef_DisplayRuleArr[$i][0])
+				EndIf
+				If $DoAttrDefCollationRule Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_CollationRuleArr[$i][0]-1) & $NewAttrDefCollationRule & StringMid($OutputData,$LocalAttrDef_CollationRuleArr[$i][0]+(StringLen($NewAttrDefCollationRule)),$InputDataSize-$LocalAttrDef_CollationRuleArr[$i][0])
+				EndIf
+				If $DoAttrDefFlags Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_FlagsArr[$i][0]-1) & $NewAttrDefFlags & StringMid($OutputData,$LocalAttrDef_FlagsArr[$i][0]+(StringLen($NewAttrDefFlags)),$InputDataSize-$LocalAttrDef_FlagsArr[$i][0])
+				EndIf
+				If $DoAttrDefMinLength Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_MinLengthArr[$i][0]-1) & $NewAttrDefMinLength & StringMid($OutputData,$LocalAttrDef_MinLengthArr[$i][0]+(StringLen($NewAttrDefMinLength)),$InputDataSize-$LocalAttrDef_MinLengthArr[$i][0])
+				EndIf
+				If $DoAttrDefMaxLength Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_MaxLengthArr[$i][0]-1) & $NewAttrDefMaxLength & StringMid($OutputData,$LocalAttrDef_MaxLengthArr[$i][0]+(StringLen($NewAttrDefMaxLength)),$InputDataSize-$LocalAttrDef_MaxLengthArr[$i][0])
+				EndIf
+
+			EndIf
+		Next
+	Else ;Set new attribute definition
+		For $i = 1 To Ubound($LocalAttrDef_AttributeNumberArr)-1
+			If ($LocalAttrDef_AttributeNameArr[$i][1] = "") Then
+				$AttrMatchCounter += 1
+
+				If $DoAttrDefAttrName Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_AttributeNameArr[$i][0]-1) & $NewAttrDefAttrName & StringMid($OutputData,$LocalAttrDef_AttributeNameArr[$i][0]+256,$InputDataSize-256)
+				EndIf
+				If $DoAttrDefAttrCode Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_AttributeCodeArr[$i][0]-1) & $NewAttrDefAttrCode & StringMid($OutputData,$LocalAttrDef_AttributeCodeArr[$i][0]+(StringLen($NewAttrDefAttrCode)),$InputDataSize-$LocalAttrDef_AttributeCodeArr[$i][0])
+				EndIf
+				If $DoAttrDefDisplayRule Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_DisplayRuleArr[$i][0]-1) & $NewAttrDefDisplayRule & StringMid($OutputData,$LocalAttrDef_DisplayRuleArr[$i][0]+(StringLen($NewAttrDefDisplayRule)),$InputDataSize-$LocalAttrDef_DisplayRuleArr[$i][0])
+				EndIf
+				If $DoAttrDefCollationRule Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_CollationRuleArr[$i][0]-1) & $NewAttrDefCollationRule & StringMid($OutputData,$LocalAttrDef_CollationRuleArr[$i][0]+(StringLen($NewAttrDefCollationRule)),$InputDataSize-$LocalAttrDef_CollationRuleArr[$i][0])
+				EndIf
+				If $DoAttrDefFlags Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_FlagsArr[$i][0]-1) & $NewAttrDefFlags & StringMid($OutputData,$LocalAttrDef_FlagsArr[$i][0]+(StringLen($NewAttrDefFlags)),$InputDataSize-$LocalAttrDef_FlagsArr[$i][0])
+				EndIf
+				If $DoAttrDefMinLength Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_MinLengthArr[$i][0]-1) & $NewAttrDefMinLength & StringMid($OutputData,$LocalAttrDef_MinLengthArr[$i][0]+(StringLen($NewAttrDefMinLength)),$InputDataSize-$LocalAttrDef_MinLengthArr[$i][0])
+				EndIf
+				If $DoAttrDefMaxLength Then
+					$WorkCounter+=1
+					$OutputData = StringMid($OutputData,1,$LocalAttrDef_MaxLengthArr[$i][0]-1) & $NewAttrDefMaxLength & StringMid($OutputData,$LocalAttrDef_MaxLengthArr[$i][0]+(StringLen($NewAttrDefMaxLength)),$InputDataSize-$LocalAttrDef_MaxLengthArr[$i][0])
+				EndIf
+
+			EndIf
+		Next
+	EndIf
+
+	If $WorkCounter = 0 Then
+		ConsoleWrite("There was nothing to do in $AttrDef" & @crlf)
+		Return 0
+	EndIf
+
+	If StringLeft($OutputData,2) <> '0x' Then $OutputData = '0x' & $OutputData
+	$OutputDataSize = StringLen($OutputData)-2
+
+;	ConsoleWrite("$OutputDataSize: " & $OutputDataSize & @crlf)
+;	ConsoleWrite("$InputDataSize: " & $InputDataSize & @crlf)
+
+;	ConsoleWrite("Modified data:" & @crlf)
+;	ConsoleWrite(_HexEncode($OutputData) & @crlf)
+;	Exit
+
+	;Put modified data into new buffer
+	Local $tBuffer2 = DllStructCreate("byte[" & $ChunkSize & "]")
+	DllStructSetData($tBuffer2,1,$OutputData)
+
+	$Success = _WriteIt($DiskOffset, $tBuffer2)
+
+	_WinAPI_CloseHandle($hFile)
+
+	Return $Success
 EndFunc

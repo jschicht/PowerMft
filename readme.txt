@@ -10,6 +10,7 @@ $I30 index in $INDEX_ROOT attribute (parent of target).
 $I30 index in $INDEX_ALLOCATION attribute (parent of target).
 $O index in $ObjId at $INDEX_ROOT/$INDEX_ALLOCATION (relevant for files containing $OBJECT_ID attribute).
 $R index in $Reparse at $INDEX_ROOT/$INDEX_ALLOCATION (relevant for files containing $REPARSE_POINT attribute).
+$DATA in $AttrDef (the Attribute Definition Table).
 
 Given that the $O and $R index already are supported in $INDEX_ROOT/$INDEX_ALLOCATION it would be trivial to implement support for modifying $OBJECT_ID and $REPARSE_POINT attributes.
 
@@ -61,6 +62,17 @@ Variables for the $FILE_NAME attribute:
 	/FNNameLength is the number of characters in file name. (1 bytes)
 	/FNNameSpace is the filename namespace. (1 bytes)
 	/FNFilename is the file name. (FNNameLength bytes)
+
+Variables for $AttrDef:
+	/ADVariable can be some combination of variables from the Attribute Definition Table in $AttrDef:
+	/ADExistingAttrName is for Attribute Name in attribute definitions in $AttrDef. (128 bytes including padding)
+	/ADAttrName is for Attribute Name in attribute definitions in $AttrDef. (128 bytes including padding)
+	/ADAttrCode is for Attribute Code in attribute definitions in $AttrDef. (4 bytes)
+	/ADDisplayRule is for Display Rule in attribute definitions in $AttrDef. (4 bytes)
+	/ADCollationRule is for Collation Rule in attribute definitions in $AttrDef. (4 bytes)
+	/ADFlags is for Flags in attribute definitions in $AttrDef. See explanation. (4 bytes)
+	/ADMinLength is for Attribute Minimum length/size in attribute definitions in $AttrDef. (8 bytes)
+	/ADMaxLength is for Attribute Maximum length/size in attribute definitions in $AttrDef. (8 bytes)
 
 Although the tool supports a large amount of fields to be modified, it does not mean it will work after the modification. You may for instance set invalid value that the system automatically detects and fixes (usually deletes the file).
 
@@ -115,6 +127,15 @@ Reparse point work differently though as they have their own MFT record, but as 
 Can Windows fix invalid filenames itself?
 The short answer is no in most cases. What chkdsk will do is simply delete the file, which is a horrible fix for a semi-trivial task.
 
+/ADFlags is some flags for an entry in the Attribute Definition Table in $AttrDef. Presumed meaning:
+ZERO = 0x0000 (unknown)
+INDEXABLE = 0x0002 (This flag is set if the attribute may be indexed)
+DUPLICATES_ALLOWED = 0x0004 (This flag is set if the attribute may occur more than once, such as is allowed for the File Name attribute)
+MAY_NOT_BE_NULL = 0x0008 (This flag is set if the value of the attribute may not be entirely null, i.e., all binary 0's)
+MUST_BE_INDEXED = 0x0010 (This attribute must be indexed, and no two attributes may exist with the same value in the same file record segment)
+MUST_BE_NAMED = 0x0020 (This attribute must be named, and no two attributes may exist with the same name in the same file record segment)
+MUST_BE_RESIDENT = 0x0040 (This attribute must be in the Resident Form)
+LOG_NONRESIDENT = 0x0080 (Modifications to this attribute should be logged even if the attribute is nonresident)
 
 Examples
 PowerMft.exe /Target:c:\bootmgr /Verbose:1
@@ -149,3 +170,9 @@ PowerMft.exe /Target:D:\file.ext /FNFileName:0x20002000200020002000200020002000
 
 PowerMft.exe /Target:"D:\        " /FNCoreFileName:"        " /FNFileName:file.ext
 (Rename back the invisible file with the 8 spaces to D:\file.ext in $FILE_NAME and the $I30 index.)
+
+PowerMft.exe /Target:D:4 /ADExistingAttrName:$REPARSE_POINT /ADAttrName:$CHKDSK_UNHAPPY
+(Access the Attribute Definition Table in $AttrDef and change the name of $REPARSE_POINT to $CHKDSK_UNHAPPY)
+
+PowerMft.exe /Target:D:4 /ADAttrName:$CHKDSK_UNHAPPY /ADAttrCode:272 /ADDisplayRule:0 /ADCollationRule:0 /ADFlags:128 /ADMinLength:0 /ADMaxLength:16384
+(Access the Attribute Definition Table in $AttrDef and create the new attribute $CHKDSK_UNHAPPY)
