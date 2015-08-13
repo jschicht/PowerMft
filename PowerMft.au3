@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Advanced $MFT modification tool for NTFS
 #AutoIt3Wrapper_Res_Description=Advanced $MFT modification tool for NTFS
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.1
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.2
 #AutoIt3Wrapper_Res_LegalCopyright=Joakim Schicht
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #AutoIt3Wrapper_Res_File_Add=C:\tmp\sectorio.sys
@@ -20,6 +20,9 @@
 ; https://github.com/jschicht
 
 ;Global $DoRead=0
+Global $NewOIGUIDObjectID,$NewOIGUIDBirthVolumeID,$NewOIGUIDBirthObjectID,$NewOIGUIDBirthDomainID
+Global $DoOIGUIDObjectID=0,$DoOIGUIDBirthVolumeID=0,$DoOIGUIDBirthObjectID=0,$DoOIGUIDBirthDomainID=0
+Global $OIArrValue[5][1],$OIArrOffset[5][1],$OIArrSize[5][1]
 Global $NewAttrDefExistingAttrName,$NewAttrDefAttrName,$NewAttrDefAttrCode,$NewAttrDefDisplayRule,$NewAttrDefCollationRule,$NewAttrDefFlags,$NewAttrDefMinLength,$NewAttrDefMaxLength
 Global $DoAttrDefExistingAttrName=0,$DoAttrDefAttrName=0,$DoAttrDefAttrCode=0,$DoAttrDefDisplayRule=0,$DoAttrDefCollationRule=0,$DoAttrDefFlags=0,$DoAttrDefMinLength=0,$DoAttrDefMaxLength=0,$GlobalAttrDefFlag=0
 Global $GlobalWorkCounter=0, $VerboseOn=0, $FNCoreFileName, $FNForceFileName
@@ -76,7 +79,7 @@ Global Const $tagUNICODESTRING = "ushort Length;ushort MaximumLength;ptr Buffer"
 Global $Timerstart = TimerInit()
 
 ConsoleWrite("Starting PowerMft by Joakim Schicht" & @CRLF)
-ConsoleWrite("Version 1.0.0.1" & @CRLF & @CRLF)
+ConsoleWrite("Version 1.0.0.2" & @CRLF & @CRLF)
 
 If Not $cmdline[0] Then
 	ConsoleWrite("Error: Missing parameters" & @CRLF)
@@ -190,8 +193,8 @@ Else
 	ConsoleWrite("There was no INDX records of parent to patch" & @CRLF)
 EndIf
 
-If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Then
-	;Check the $O index in $ObjId
+;Check the $O index in $ObjId
+If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Or $DoOIGUIDObjectID Or $DoOIGUIDBirthVolumeID Or $DoOIGUIDBirthObjectID Or $DoOIGUIDBirthDomainID Then
 	$RetRec = _FindFileMFTRecord($TargetDrive,25)
 	If Not IsArray($RetRec) Then
 		ConsoleWrite("Error: Could not locate $ObjId." & @CRLF)
@@ -211,8 +214,10 @@ If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Then
 			ConsoleWrite("There was no $INDEX_ALLOCATION attribute with INDX records with $O index in $ObjId to patch" & @CRLF)
 		EndIf
 	EndIf
+EndIf
 
-	;Check the $R index in $Reparse
+;Check the $R index in $Reparse
+If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Then
 	$RetRec = _FindFileMFTRecord($TargetDrive,26)
 	If Not IsArray($RetRec) Then
 		ConsoleWrite("Error: Could not locate $Reparse." & @CRLF)
@@ -1532,6 +1537,8 @@ Local $INDEX_ROOT_ON="FALSE",$INDEX_ALLOCATION_ON="FALSE",$CoreData[2],$CoreData
 Global $DataQ[1],$Mode2Data=""
 Global $IRArr[12][2],$IndxArr[20][2]
 Global $HdrArrValue[17][2], $HdrArrOffset[17][2], $HdrArrSize[17][2]
+Global $OIArrValue[5][2],$OIArrOffset[5][2],$OIArrSize[5][2]
+
 
 _SetArrays()
 $HEADER_RecordRealSize = ""
@@ -1710,6 +1717,7 @@ While 1
 			If $IsRawShadowCopy Then Return 1 ;We are only interested in ref and name for comparison.
 ;			$OBJECT_ID_ON = "TRUE"
 			$OBJID_Number += 1
+			_Get_ObjectID($MFTEntry,$AttributeOffset,$AttributeSize,$OBJID_Number)
 		Case $AttributeType = $SECURITY_DESCRIPTOR
 			If $IsRawShadowCopy Then Return 1 ;We are only interested in ref and name for comparison.
 ;			$SECURITY_DESCRIPTOR_ON = "TRUE"
@@ -4922,7 +4930,7 @@ Func _RawModMft($DiskOffset,$TargetRef)
 		ConsoleWrite(_HexEncode($MFTRecordDump) & @crlf)
 	EndIf
 
-	Local $WorkCounter1=0,$WorkCounter2=0,$WorkCounter3=0
+	Local $WorkCounter1=0,$WorkCounter2=0,$WorkCounter3=0,$WorkCounter4=0
 
 	If $HdrArrValue[1][1] = 48 Then
 		$IsNewStyle = 1
@@ -5135,12 +5143,50 @@ Func _RawModMft($DiskOffset,$TargetRef)
 
 	Next
 
-	If ($WorkCounter1=0 And $WorkCounter2=0 And $WorkCounter3=0) Then
+	;Check for $OBJECT_ID related modifications
+	If $DoOIGUIDObjectID Then
+		If $OIArrSize[1][1] = 32 Then
+			$WorkCounter4+=1
+			$MFTRecordDump = StringMid($MFTRecordDump,1,$OIArrOffset[1][1]-1) & $NewOIGUIDObjectID & StringMid($MFTRecordDump,$OIArrOffset[1][1]+StringLen($NewOIGUIDObjectID),($MFT_Record_Size*2)-$OIArrOffset[1][1])
+		Else
+			ConsoleWrite("Error: GUIDObjectID can't be modified when source is empty." & @crlf)
+			$DoOIGUIDObjectID = 0
+		EndIf
+	EndIf
+	If $DoOIGUIDBirthVolumeID Then
+		If $OIArrSize[2][1] = 32 Then
+			$WorkCounter4+=1
+			$MFTRecordDump = StringMid($MFTRecordDump,1,$OIArrOffset[2][1]-1) & $NewOIGUIDBirthVolumeID & StringMid($MFTRecordDump,$OIArrOffset[2][1]+StringLen($NewOIGUIDBirthVolumeID),($MFT_Record_Size*2)-$OIArrOffset[2][1])
+		Else
+			ConsoleWrite("Error: GUIDBirthVolumeID can't be modified when source is empty." & @crlf)
+			$DoOIGUIDBirthVolumeID = 0
+		EndIf
+	EndIf
+	If $DoOIGUIDBirthObjectID Then
+		If $OIArrSize[3][1] = 32 Then
+			$WorkCounter4+=1
+			$MFTRecordDump = StringMid($MFTRecordDump,1,$OIArrOffset[3][1]-1) & $NewOIGUIDBirthObjectID & StringMid($MFTRecordDump,$OIArrOffset[3][1]+StringLen($NewOIGUIDBirthObjectID),($MFT_Record_Size*2)-$OIArrOffset[3][1])
+		Else
+			ConsoleWrite("Error: GUIDBirthObjectID can't be modified when source is empty." & @crlf)
+			$DoOIGUIDBirthObjectID = 0
+		EndIf
+	EndIf
+	If $DoOIGUIDBirthDomainID Then
+		If $OIArrSize[4][1] = 32 Then
+			$WorkCounter4+=1
+			$MFTRecordDump = StringMid($MFTRecordDump,1,$OIArrOffset[4][1]-1) & $NewOIGUIDBirthDomainID & StringMid($MFTRecordDump,$OIArrOffset[4][1]+StringLen($NewOIGUIDBirthDomainID),($MFT_Record_Size*2)-$OIArrOffset[4][1])
+		Else
+			ConsoleWrite("Error: GUIDBirthDomainID can't be modified when source is empty." & @crlf)
+			$DoOIGUIDBirthDomainID = 0
+		EndIf
+	EndIf
+
+	If ($WorkCounter1=0 And $WorkCounter2=0 And $WorkCounter3=0 And $WorkCounter4=0) Then
 		$GlobalWorkCounter=0
 		ConsoleWrite("Nothing to do in MFT record." & @crlf)
 		Return
 	Else
-		$GlobalWorkCounter = $WorkCounter1+$WorkCounter2+$WorkCounter3
+		$GlobalWorkCounter = $WorkCounter1+$WorkCounter2+$WorkCounter3+$WorkCounter4
 	EndIf
 
 	If $VerboseOn Then
@@ -7167,7 +7213,7 @@ Func _ParseParentIndexRoot2($TargetDevice,$TargetRef,$Entry,$IR_Offset,$IR_Size)
 EndFunc
 
 Func _PrintHelp()
-	ConsoleWrite("PowerMft.exe /Target:TargetPath /Verbose:{0|1} /HdrVariable:{value} /SIVariable:{value} /FNVariable:{value} /ADVariable:{value}" & @CRLF)
+	ConsoleWrite("PowerMft.exe /Target:TargetPath /Verbose:{0|1} /HdrVariable:{value} /SIVariable:{value} /FNVariable:{value} /ADVariable:{value} /OIVariable:{value}" & @CRLF)
 	ConsoleWrite("	/Target can be any file or directory, and may be specified as filename with full path or Volume+MftRef." & @CRLF)
 	ConsoleWrite("	/Verbose is verbosity of output flag. Set to 0 or 1. Default 0." & @CRLF)
 	ConsoleWrite(@CRLF)
@@ -7231,6 +7277,12 @@ Func _PrintHelp()
 	ConsoleWrite("	/ADMinLength is for Attribute Minimum length/size in attribute definitions in $AttrDef." & @CRLF)
 	ConsoleWrite("	/ADMaxLength is for Attribute Maximum length/size in attribute definitions in $AttrDef." & @CRLF)
 	ConsoleWrite(@CRLF)
+	ConsoleWrite("	/OIVariable can be some combination of variables from the $OBJECT_ID:" & @CRLF)
+	ConsoleWrite("	/OIGUIDObjectID is the GUID Object ID in $OBJECT_ID. (16 bytes excluding formatting)" & @CRLF)
+	ConsoleWrite("	/OIGUIDBirthVolumeID is the GUID Birth Volume ID in $OBJECT_ID. (16 bytes excluding formatting)" & @CRLF)
+	ConsoleWrite("	/OIGUIDBirthObjectID is the GUID Birth Object ID in $OBJECT_ID. (16 bytes excluding formatting)" & @CRLF)
+	ConsoleWrite("	/OIGUIDBirthDomainID is the GUID Birth Domain ID in $OBJECT_ID. (16 bytes excluding formatting)" & @CRLF)
+	ConsoleWrite(@CRLF)
 	ConsoleWrite("Examples:" & @CRLF & @CRLF)
 	ConsoleWrite("PowerMft.exe /Target:c:\bootmgr /Verbose:1" & @CRLF)
 	ConsoleWrite("(Will just dump the MFT record for the bootmgr file on volume c)" & @CRLF & @CRLF)
@@ -7256,8 +7308,10 @@ Func _PrintHelp()
 	ConsoleWrite('(Rename back the invisible file with the 8 spaces to D:\file.ext in $FILE_NAME and the $I30 index.)' & @CRLF & @CRLF)
 	ConsoleWrite('PowerMft.exe /Target:D:4 /ADExistingAttrName:$REPARSE_POINT /ADAttrName:$CHKDSK_UNHAPPY' & @CRLF)
 	ConsoleWrite('(Access the Attribute Definition Table in $AttrDef and change the name of $REPARSE_POINT to $CHKDSK_UNHAPPY)' & @CRLF & @CRLF)
-	ConsoleWrite('PowerMft.exe /Target:D:4 /ADAttrName:$CHKDSK_UNHAPPY /ADAttrCode:272 /ADDisplayRule:0 /ADCollationRule:0 /ADFlags:128 /ADMinLength:0 /ADMaxLength:16384' & @CRLF)
-	ConsoleWrite('(Access the Attribute Definition Table in $AttrDef and create the new attribute $CHKDSK_UNHAPPY)' & @CRLF & @CRLF)
+	ConsoleWrite('PowerMft.exe /Target:D:4 /ADAttrName:$CHKDSK_UNHAPPY /ADAttrCode:4096 /ADDisplayRule:0 /ADCollationRule:0 /ADFlags:128 /ADMinLength:0 /ADMaxLength:16384' & @CRLF)
+	ConsoleWrite('(Access the Attribute Definition Table in $AttrDef and create the new attribute $CHKDSK_UNHAPPY with attribute code $FIRST_USER_DEFINED_ATTRIBUTE)' & @CRLF & @CRLF)
+	ConsoleWrite('PowerMft.exe /Target:D:\test.txt /OIGUIDBirthDomainID:{00112233-4455-6677-8899-AABBCCDDEEFF}' & @CRLF)
+	ConsoleWrite("(Set the GUID BirthDomainID of D:\test.txt to {00112233-4455-6677-8899-AABBCCDDEEFF} in $OBJECT_ID attribute and the $O index in $ObjId)" & @CRLF & @CRLF)
 EndFunc
 
 Func _ValidateInput()
@@ -7330,7 +7384,7 @@ Func _ValidateInput()
 		If StringLeft($cmdline[$i],12) = "/FNFileName:" Then $NewFNFilename = StringMid($cmdline[$i],13)
 		If StringLeft($cmdline[$i],17) = "/FNForceFileName:" Then $FNForceFileName = Int(StringMid($cmdline[$i],18))
 		If StringLeft($cmdline[$i],16) = "/FNCoreFileName:" Then $FNCoreFileName = StringMid($cmdline[$i],17)
-		;$AttrDef
+		;$AttrDef:$DATA
 		If StringLeft($cmdline[$i],20) = "/ADExistingAttrName:" Then $NewAttrDefExistingAttrName = StringMid($cmdline[$i],21)
 		If StringLeft($cmdline[$i],12) = "/ADAttrName:" Then $NewAttrDefAttrName = StringMid($cmdline[$i],13)
 		If StringLeft($cmdline[$i],12) = "/ADAttrCode:" Then $NewAttrDefAttrCode = StringMid($cmdline[$i],13)
@@ -7339,6 +7393,11 @@ Func _ValidateInput()
 		If StringLeft($cmdline[$i],9) = "/ADFlags:" Then $NewAttrDefFlags = Int(StringMid($cmdline[$i],10))
 		If StringLeft($cmdline[$i],13) = "/ADMinLength:" Then $NewAttrDefMinLength = Int(StringMid($cmdline[$i],14))
 		If StringLeft($cmdline[$i],13) = "/ADMaxLength:" Then $NewAttrDefMaxLength = Int(StringMid($cmdline[$i],14))
+		;$OBJECT_ID
+		If StringLeft($cmdline[$i],16) = "/OIGUIDObjectID:" Then $NewOIGUIDObjectID = StringMid($cmdline[$i],17)
+		If StringLeft($cmdline[$i],21) = "/OIGUIDBirthVolumeID:" Then $NewOIGUIDBirthVolumeID = StringMid($cmdline[$i],22)
+		If StringLeft($cmdline[$i],21) = "/OIGUIDBirthObjectID:" Then $NewOIGUIDBirthObjectID = StringMid($cmdline[$i],22)
+		If StringLeft($cmdline[$i],21) = "/OIGUIDBirthDomainID:" Then $NewOIGUIDBirthDomainID = StringMid($cmdline[$i],22)
 
 	Next
 
@@ -7859,8 +7918,60 @@ Func _ValidateInput()
 	EndIf
 	$GlobalAttrDefFlag = $DoAttrDefAttrName+$DoAttrDefAttrCode+$DoAttrDefDisplayRule+$DoAttrDefCollationRule+$DoAttrDefFlags+$DoAttrDefMinLength+$DoAttrDefMaxLength
 
-	ConsoleWrite(@CRLF)
+	;$OBJECT_ID
+	If StringLen($NewOIGUIDObjectID) > 0 Then
+		If StringLen($NewOIGUIDObjectID) = 38 Then
+			ConsoleWrite("$NewOIGUIDObjectID: " & $NewOIGUIDObjectID & @CRLF)
+			$DoOIGUIDObjectID = 1
+			$NewOIGUIDObjectID = _GuidToHexString($NewOIGUIDObjectID)
+		Else
+			ConsoleWrite("Error: /OIGUIDObjectID was incorrectly formatted: " & $NewOIGUIDObjectID & @CRLF)
+		EndIf
+	EndIf
+	If StringLen($NewOIGUIDBirthVolumeID) > 0 Then
+		If StringLen($NewOIGUIDBirthVolumeID) = 38 Then
+			ConsoleWrite("$NewOIGUIDBirthVolumeID: " & $NewOIGUIDBirthVolumeID & @CRLF)
+			$DoOIGUIDBirthVolumeID = 1
+			$NewOIGUIDBirthVolumeID = _GuidToHexString($NewOIGUIDBirthVolumeID)
+		Else
+			ConsoleWrite("Error: /OIGUIDBirthVolumeID was incorrectly formatted: " & $NewOIGUIDBirthVolumeID & @CRLF)
+		EndIf
+	EndIf
+	If StringLen($NewOIGUIDBirthObjectID) > 0 Then
+		If StringLen($NewOIGUIDBirthObjectID) = 38 Then
+			ConsoleWrite("$NewOIGUIDBirthObjectID: " & $NewOIGUIDBirthObjectID & @CRLF)
+			$DoOIGUIDBirthObjectID = 1
+			$NewOIGUIDBirthObjectID = _GuidToHexString($NewOIGUIDBirthObjectID)
+		Else
+			ConsoleWrite("Error: /OIGUIDBirthObjectID was incorrectly formatted: " & $NewOIGUIDBirthObjectID & @CRLF)
+		EndIf
+	EndIf
+	If StringLen($NewOIGUIDBirthDomainID) > 0 Then
+		If StringLen($NewOIGUIDBirthDomainID) = 38 Then
+			ConsoleWrite("$NewOIGUIDBirthDomainID: " & $NewOIGUIDBirthDomainID & @CRLF)
+			$DoOIGUIDBirthDomainID = 1
+			$NewOIGUIDBirthDomainID = _GuidToHexString($NewOIGUIDBirthDomainID)
+		Else
+			ConsoleWrite("Error: /OIGUIDBirthDomainID was incorrectly formatted: " & $NewOIGUIDBirthDomainID & @CRLF)
+		EndIf
+	EndIf
 
+	ConsoleWrite(@CRLF)
+EndFunc
+
+Func _GuidToHexString($input)
+	;{4b-2b-2b-2b-6b}
+	Local $OutStr
+	If Not StringLen($input) = 38 Then Return SetError(1,0,0)
+	$input = StringReplace($input,"{","")
+	$input = StringReplace($input,"-","")
+	$input = StringReplace($input,"}","")
+	$OutStr &= _SwapEndian(StringMid($input,1,8))
+	$OutStr &= _SwapEndian(StringMid($input,9,4))
+	$OutStr &= _SwapEndian(StringMid($input,13,4))
+	$OutStr &= StringMid($input,17,4)
+	$OutStr &= StringMid($input,21,12)
+	Return $OutStr
 EndFunc
 
 Func _TestObjIdOIndexRoot($TargetDevice,$TargetRef,$Entry,$IR_Offset,$IR_Size)
@@ -8067,6 +8178,8 @@ Func _TestObjIdOIndexRoot($TargetDevice,$TargetRef,$Entry,$IR_Offset,$IR_Size)
 ;		Until Int($NextEntryOffset+176) >= Int($IR_Size)
 	EndIf
 ;	_ArrayDisplay($GlobalObjIdO_MftRef,"$GlobalObjIdO_MftRef")
+;	_ArrayDisplay($GlobalObjIdO_GUIDObjectId,"$GlobalObjIdO_GUIDObjectId")
+;	_ArrayDisplay($GlobalObjIdO_GUIDBirthVolumeId,"$GlobalObjIdO_GUIDBirthVolumeId")
 	Return 1
 EndFunc
 
@@ -8209,13 +8322,29 @@ Func _Preparse_ObjId($TargetDevice,$DiskOffset,$TargetRef)
 		If $TargetRef = $GlobalObjIdO_MftRef[$i][1] Then
 			If $GlobalObjIdO_DataOffset[$i][1] = 0 Then ContinueLoop ;Probably something wrong
 			$EntryMatchCounter += 1
-			If $DoHdrSequenceNo Then
+			If $DoOIGUIDObjectID Then
 				$WorkCounter+=1
-				$MFTEntry = StringMid($MFTEntry,1,$GlobalObjIdO_MftSeqNo[$i][0]-1) & $NewHdr_SequenceNo & StringMid($MFTEntry,$GlobalObjIdO_MftSeqNo[$i][0]+4,($INDX_Record_Size*2)-$GlobalObjIdO_MftSeqNo[$i][0])
+				$MFTEntry = StringMid($MFTEntry,1,$GlobalObjIdO_GUIDObjectId[$i][0]-1) & $NewOIGUIDObjectID & StringMid($MFTEntry,$GlobalObjIdO_GUIDObjectId[$i][0]+StringLen($NewOIGUIDObjectID),($INDX_Record_Size*2)-$GlobalObjIdO_GUIDObjectId[$i][0])
 			EndIf
 			If $DoHdrMFTREcordNumber Then
 				$WorkCounter+=1
 				$MFTEntry = StringMid($MFTEntry,1,$GlobalObjIdO_MftRef[$i][0]-1) & $NewHdr_MFTREcordNumber & StringMid($MFTEntry,$GlobalObjIdO_MftRef[$i][0]+12,($INDX_Record_Size*2)-$GlobalObjIdO_MftRef[$i][0])
+			EndIf
+			If $DoHdrSequenceNo Then
+				$WorkCounter+=1
+				$MFTEntry = StringMid($MFTEntry,1,$GlobalObjIdO_MftSeqNo[$i][0]-1) & $NewHdr_SequenceNo & StringMid($MFTEntry,$GlobalObjIdO_MftSeqNo[$i][0]+4,($INDX_Record_Size*2)-$GlobalObjIdO_MftSeqNo[$i][0])
+			EndIf
+			If $DoOIGUIDBirthVolumeID Then
+				$WorkCounter+=1
+				$MFTEntry = StringMid($MFTEntry,1,$GlobalObjIdO_GUIDBirthVolumeId[$i][0]-1) & $NewOIGUIDBirthVolumeID & StringMid($MFTEntry,$GlobalObjIdO_GUIDBirthVolumeId[$i][0]+StringLen($NewOIGUIDBirthVolumeID),($INDX_Record_Size*2)-$GlobalObjIdO_GUIDBirthVolumeId[$i][0])
+			EndIf
+			If $DoOIGUIDBirthObjectID Then
+				$WorkCounter+=1
+				$MFTEntry = StringMid($MFTEntry,1,$GlobalObjIdO_GUIDBirthObjectId[$i][0]-1) & $NewOIGUIDBirthObjectID & StringMid($MFTEntry,$GlobalObjIdO_GUIDBirthObjectId[$i][0]+StringLen($NewOIGUIDBirthObjectID),($INDX_Record_Size*2)-$GlobalObjIdO_GUIDBirthObjectId[$i][0])
+			EndIf
+			If $DoOIGUIDBirthDomainID Then
+				$WorkCounter+=1
+				$MFTEntry = StringMid($MFTEntry,1,$GlobalObjIdO_GUIDDomainId[$i][0]-1) & $NewOIGUIDBirthDomainID & StringMid($MFTEntry,$GlobalObjIdO_GUIDDomainId[$i][0]+StringLen($NewOIGUIDBirthDomainID),($INDX_Record_Size*2)-$GlobalObjIdO_GUIDDomainId[$i][0])
 			EndIf
 		EndIf
 	Next
@@ -8464,13 +8593,29 @@ Func _RawModIndxO($DiskOffset,$NumberOfRecords,$TargetRef)
 			If $TargetRef = $LocalObjIdO_MftRef[$i][1] Then
 ;				If $LocalObjIdO_DataSize[$i][1] = 0 Then ContinueLoop ;Probably something wrong
 				$Counter+=1
-				If $DoHdrSequenceNo Then
+				If $DoOIGUIDObjectID Then
 					$WorkCounter+=1
-					$Entry = StringMid($Entry,1,$LocalObjIdO_MftSeqNo[$i][0]-1) & $NewHdr_SequenceNo & StringMid($Entry,$LocalObjIdO_MftSeqNo[$i][0]+4,($INDX_Record_Size*2)-$LocalObjIdO_MftSeqNo[$i][0])
+					$Entry = StringMid($Entry,1,$LocalObjIdO_GUIDObjectId[$i][0]-1) & $NewOIGUIDObjectID & StringMid($Entry,$LocalObjIdO_GUIDObjectId[$i][0]+StringLen($NewOIGUIDObjectID),($INDX_Record_Size*2)-$LocalObjIdO_GUIDObjectId[$i][0])
 				EndIf
 				If $DoHdrMFTREcordNumber Then
 					$WorkCounter+=1
 					$Entry = StringMid($Entry,1,$LocalObjIdO_MftRef[$i][0]-1) & $NewHdr_MFTREcordNumber & StringMid($Entry,$LocalObjIdO_MftRef[$i][0]+12,($INDX_Record_Size*2)-$LocalObjIdO_MftRef[$i][0])
+				EndIf
+				If $DoHdrSequenceNo Then
+					$WorkCounter+=1
+					$Entry = StringMid($Entry,1,$LocalObjIdO_MftSeqNo[$i][0]-1) & $NewHdr_SequenceNo & StringMid($Entry,$LocalObjIdO_MftSeqNo[$i][0]+4,($INDX_Record_Size*2)-$LocalObjIdO_MftSeqNo[$i][0])
+				EndIf
+				If $DoOIGUIDBirthVolumeID Then
+					$WorkCounter+=1
+					$Entry = StringMid($Entry,1,$LocalObjIdO_GUIDBirthVolumeId[$i][0]-1) & $NewOIGUIDBirthVolumeID & StringMid($Entry,$LocalObjIdO_GUIDBirthVolumeId[$i][0]+StringLen($NewOIGUIDBirthVolumeID),($INDX_Record_Size*2)-$LocalObjIdO_GUIDBirthVolumeId[$i][0])
+				EndIf
+				If $DoOIGUIDBirthObjectID Then
+					$WorkCounter+=1
+					$Entry = StringMid($Entry,1,$LocalObjIdO_GUIDBirthObjectId[$i][0]-1) & $NewOIGUIDBirthObjectID & StringMid($Entry,$LocalObjIdO_GUIDBirthObjectId[$i][0]+StringLen($NewOIGUIDBirthObjectID),($INDX_Record_Size*2)-$LocalObjIdO_GUIDBirthObjectId[$i][0])
+				EndIf
+				If $DoOIGUIDBirthDomainID Then
+					$WorkCounter+=1
+					$Entry = StringMid($Entry,1,$LocalObjIdO_GUIDDomainId[$i][0]-1) & $NewOIGUIDBirthDomainID & StringMid($Entry,$LocalObjIdO_GUIDDomainId[$i][0]+StringLen($NewOIGUIDBirthDomainID),($INDX_Record_Size*2)-$LocalObjIdO_GUIDDomainId[$i][0])
 				EndIf
 			EndIf
 		Next
@@ -8543,21 +8688,6 @@ Func _RawModIndxO($DiskOffset,$NumberOfRecords,$TargetRef)
 			ConsoleWrite("Error: Ref " & $TargetRef & " was found in this INDX record, but modification failed" & @crlf)
 	EndSelect
 	Return $Success
-EndFunc
-
-Func _HexToGuidStr($input,$mode)
-	;{4b-2b-2b-2b-6b}
-	Local $OutStr
-	If Not StringLen($input) = 32 Then Return $input
-	If $mode Then $OutStr = "{"
-	For $i = 1 To 32 Step 2
-		$OutStr &= StringMid($input,$i,2)
-		If $i = 7 Or $i = 11 Or $i = 15 Or $i = 19 Then
-			$OutStr &= "-"
-		EndIf
-	Next
-	If $mode Then $OutStr &= "}"
-	Return $OutStr
 EndFunc
 
 Func _TestReparseRIndexRoot($TargetDevice,$TargetRef,$Entry,$IR_Offset,$IR_Size)
@@ -9259,6 +9389,36 @@ Func _GetReparseType($ReparseType)
 	EndSelect
 EndFunc
 
+Func _DecodeCollationRules($CRinput)
+#cs
+	COLLATION_BINARY		= const_cpu_to_le32(0x00),
+	COLLATION_FILENAME		= const_cpu_to_le32(0x01),
+	COLLATION_UNICODE_STRING	= const_cpu_to_le32(0x02),
+	COLLATION_NTOFS_ULONG		= const_cpu_to_le32(0x10),
+	COLLATION_NTOFS_SID		= const_cpu_to_le32(0x11),
+	COLLATION_NTOFS_SECURITY_HASH	= const_cpu_to_le32(0x12),
+	COLLATION_NTOFS_ULONGS		= const_cpu_to_le32(0x13),
+#ce
+	Select
+		Case $CRinput = 0x0000
+			Return 'COLLATION_BINARY'
+		Case $CRinput = 0x0001
+			Return 'COLLATION_FILE_NAME'
+		Case $CRinput = 0x0002
+			Return 'COLLATION_UNICODE_STRING'
+		Case $CRinput = 0x0010
+			Return 'COLLATION_NTOFS_ULONG'
+		Case $CRinput = 0x0011
+			Return 'COLLATION_NTOFS_SID'
+		Case $CRinput = 0x0012
+			Return 'COLLATION_NTOFS_SECURITY_HASH'
+		Case $CRinput = 0x0013
+			Return 'COLLATION_NTOFS_ULONGS'
+		Case Else
+			Return 'UNKNOWN'
+	EndSelect
+EndFunc
+
 Func _DecodeAttributeFlags($AFinput)
 	Local $AFoutput = ""
 	If $AFinput = 0x0000 Then Return 'ZERO'
@@ -9657,3 +9817,156 @@ Func _RawModAttrDef($DiskOffset,$TotalAttributeSize,$ChunkSize,$TargetRef)
 
 	Return $Success
 EndFunc
+
+Func _Get_ObjectID($MFTEntry,$OBJECTID_Offset,$OBJECTID_Size,$OBJID_Number)
+;	ReDim $ObjectIDArr[5][$OBJID_Number+1]
+	Redim $OIArrValue[5][$OBJID_Number+1]
+	Redim $OIArrOffset[5][$OBJID_Number+1]
+	Redim $OIArrSize[5][$OBJID_Number+1]
+	$GUID_ObjectID = StringMid($MFTEntry,$OBJECTID_Offset+48,32)
+	;ConsoleWrite("$GUID_ObjectID = " & $GUID_ObjectID & @crlf)
+	$GUID_ObjectID = _HexToGuidStr($GUID_ObjectID,1)
+	Select
+		Case $OBJECTID_Size - 24 = 16
+			$GUID_BirthVolumeID = "NOT PRESENT"
+			$GUID_BirthObjectID = "NOT PRESENT"
+			$GUID_BirthDomainID = "NOT PRESENT"
+			If Not $IsFirstRun Then
+				;Values
+				$OIArrValue[0][$OBJID_Number] = "Field Value"
+				$OIArrValue[1][$OBJID_Number] = $GUID_ObjectID
+				$OIArrValue[2][$OBJID_Number] = ""
+				$OIArrValue[3][$OBJID_Number] = ""
+				$OIArrValue[4][$OBJID_Number] = ""
+				;Offsets
+				$OIArrOffset[0][$OBJID_Number] = "Field Offset"
+				$OIArrOffset[1][$OBJID_Number] = $OBJECTID_Offset+48
+				$OIArrOffset[2][$OBJID_Number] = -1
+				$OIArrOffset[3][$OBJID_Number] = -1
+				$OIArrOffset[4][$OBJID_Number] = -1
+				;Sizes
+				$OIArrSize[0][$OBJID_Number] = "Field Size"
+				$OIArrSize[1][$OBJID_Number] = 32
+				$OIArrSize[2][$OBJID_Number] = 0
+				$OIArrSize[3][$OBJID_Number] = 0
+				$OIArrSize[4][$OBJID_Number] = 0
+			EndIf
+		Case $OBJECTID_Size - 24 = 32
+			$GUID_BirthVolumeID = StringMid($MFTEntry,$OBJECTID_Offset+80,32)
+		;	ConsoleWrite("$GUID_BirthVolumeID = " & $GUID_BirthVolumeID & @crlf)
+			$GUID_BirthVolumeID = _HexToGuidStr($GUID_BirthVolumeID,1)
+			$GUID_BirthObjectID = "NOT PRESENT"
+			$GUID_BirthDomainID = "NOT PRESENT"
+			If Not $IsFirstRun Then
+				;Values
+				$OIArrValue[0][$OBJID_Number] = "Field Value"
+				$OIArrValue[1][$OBJID_Number] = $GUID_ObjectID
+				$OIArrValue[2][$OBJID_Number] = $GUID_BirthVolumeID
+				$OIArrValue[3][$OBJID_Number] = ""
+				$OIArrValue[4][$OBJID_Number] = ""
+				;Offsets
+				$OIArrOffset[0][$OBJID_Number] = "Field Offset"
+				$OIArrOffset[1][$OBJID_Number] = $OBJECTID_Offset+48
+				$OIArrOffset[2][$OBJID_Number] = $OBJECTID_Offset+80
+				$OIArrOffset[3][$OBJID_Number] = -1
+				$OIArrOffset[4][$OBJID_Number] = -1
+				;Sizes
+				$OIArrSize[0][$OBJID_Number] = "Field Size"
+				$OIArrSize[1][$OBJID_Number] = 32
+				$OIArrSize[2][$OBJID_Number] = 32
+				$OIArrSize[3][$OBJID_Number] = 0
+				$OIArrSize[4][$OBJID_Number] = 0
+			EndIf
+		Case $OBJECTID_Size - 24 = 48
+			$GUID_BirthVolumeID = StringMid($MFTEntry,$OBJECTID_Offset+80,32)
+		;	ConsoleWrite("$GUID_BirthVolumeID = " & $GUID_BirthVolumeID & @crlf)
+			$GUID_BirthVolumeID = _HexToGuidStr($GUID_BirthVolumeID,1)
+			$GUID_BirthObjectID = StringMid($MFTEntry,$OBJECTID_Offset+112,32)
+		;	ConsoleWrite("$GUID_BirthObjectID = " & $GUID_BirthObjectID & @crlf)
+			$GUID_BirthObjectID = _HexToGuidStr($GUID_BirthObjectID,1)
+			$GUID_BirthDomainID = "NOT PRESENT"
+			If Not $IsFirstRun Then
+				;Values
+				$OIArrValue[0][$OBJID_Number] = "Field Value"
+				$OIArrValue[1][$OBJID_Number] = $GUID_ObjectID
+				$OIArrValue[2][$OBJID_Number] = $GUID_BirthVolumeID
+				$OIArrValue[3][$OBJID_Number] = $GUID_BirthObjectID
+				$OIArrValue[4][$OBJID_Number] = ""
+				;Offsets
+				$OIArrOffset[0][$OBJID_Number] = "Field Offset"
+				$OIArrOffset[1][$OBJID_Number] = $OBJECTID_Offset+48
+				$OIArrOffset[2][$OBJID_Number] = $OBJECTID_Offset+80
+				$OIArrOffset[3][$OBJID_Number] = $OBJECTID_Offset+112
+				$OIArrOffset[4][$OBJID_Number] = -1
+				;Sizes
+				$OIArrSize[0][$OBJID_Number] = "Field Size"
+				$OIArrSize[1][$OBJID_Number] = 32
+				$OIArrSize[2][$OBJID_Number] = 32
+				$OIArrSize[3][$OBJID_Number] = 32
+				$OIArrSize[4][$OBJID_Number] = 0
+			EndIf
+
+		Case $OBJECTID_Size - 24 = 64
+			$GUID_BirthVolumeID = StringMid($MFTEntry,$OBJECTID_Offset+80,32)
+		;	ConsoleWrite("$GUID_BirthVolumeID = " & $GUID_BirthVolumeID & @crlf)
+			$GUID_BirthVolumeID = _HexToGuidStr($GUID_BirthVolumeID,1)
+			$GUID_BirthObjectID = StringMid($MFTEntry,$OBJECTID_Offset+112,32)
+		;	ConsoleWrite("$GUID_BirthObjectID = " & $GUID_BirthObjectID & @crlf)
+			$GUID_BirthObjectID = _HexToGuidStr($GUID_BirthObjectID,1)
+			$GUID_BirthDomainID = StringMid($MFTEntry,$OBJECTID_Offset+144,32)
+		;	ConsoleWrite("$GUID_BirthDomainID = " & $GUID_BirthDomainID & @crlf)
+			$GUID_BirthDomainID = _HexToGuidStr($GUID_BirthDomainID,1)
+			If Not $IsFirstRun Then
+				;Values
+				$OIArrValue[0][$OBJID_Number] = "Field Value"
+				$OIArrValue[1][$OBJID_Number] = $GUID_ObjectID
+				$OIArrValue[2][$OBJID_Number] = $GUID_BirthVolumeID
+				$OIArrValue[3][$OBJID_Number] = $GUID_BirthObjectID
+				$OIArrValue[4][$OBJID_Number] = $GUID_BirthDomainID
+				;Offsets
+				$OIArrOffset[0][$OBJID_Number] = "Field Offset"
+				$OIArrOffset[1][$OBJID_Number] = $OBJECTID_Offset+48
+				$OIArrOffset[2][$OBJID_Number] = $OBJECTID_Offset+80
+				$OIArrOffset[3][$OBJID_Number] = $OBJECTID_Offset+112
+				$OIArrOffset[4][$OBJID_Number] = $OBJECTID_Offset+144
+				;Sizes
+				$OIArrSize[0][$OBJID_Number] = "Field Size"
+				$OIArrSize[1][$OBJID_Number] = 32
+				$OIArrSize[2][$OBJID_Number] = 32
+				$OIArrSize[3][$OBJID_Number] = 32
+				$OIArrSize[4][$OBJID_Number] = 32
+			EndIf
+		Case Else
+			ConsoleWrite("Error: The $OBJECT_ID size was unexpected." & @crlf)
+
+	EndSelect
+EndFunc
+
+Func _HexToGuidStr($input,$mode)
+	;{4b-2b-2b-2b-6b}
+	Local $OutStr
+	If Not StringLen($input) = 32 Then Return $input
+	If $mode Then $OutStr = "{"
+	$OutStr &= _SwapEndian(StringMid($input,1,8)) & "-"
+	$OutStr &= _SwapEndian(StringMid($input,9,4)) & "-"
+	$OutStr &= _SwapEndian(StringMid($input,13,4)) & "-"
+	$OutStr &= StringMid($input,17,4) & "-"
+	$OutStr &= StringMid($input,21,12)
+	If $mode Then $OutStr &= "}"
+	Return $OutStr
+EndFunc
+
+Func StringFromGUID($pGUID)
+    Local $aResult = DllCall("ole32.dll", "int", "StringFromGUID2", "struct*", $pGUID, "wstr", "", "int", 40)
+    If @error Then Return SetError(@error, @extended, "")
+    Return SetExtended($aResult[0], $aResult[2])
+EndFunc
+
+Func StringFromGUID2($HexGUID)
+	$Buff = DllStructCreate("byte guid[16];")
+	DllStructSetData($Buff,"guid","0x"&$HexGUID)
+    Local $aResult = DllCall("ole32.dll", "int", "StringFromGUID2", "struct*", DllStructGetPtr($Buff), "wstr", "", "int", 40)
+    If @error Then Return SetError(@error, @extended, "")
+    Return SetExtended($aResult[0], $aResult[2])
+EndFunc
+
