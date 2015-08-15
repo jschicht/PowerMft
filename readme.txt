@@ -6,6 +6,8 @@ The tool will let you modify MFT records directly on disk. The following parts o
 The record header.
 $STANDARD_INFORMATION attribute.
 $FILE_NAME attribute.
+$OBJECT_ID attribute.
+$REPARSE_POINT attribute.
 $I30 index in $INDEX_ROOT attribute (parent of target).
 $I30 index in $INDEX_ALLOCATION attribute (parent of target).
 $O index in $ObjId at $INDEX_ROOT/$INDEX_ALLOCATION (relevant for files containing $OBJECT_ID attribute).
@@ -74,6 +76,13 @@ Variables for $AttrDef:
 	/ADMinLength is for Attribute Minimum length/size in attribute definitions in $AttrDef. (8 bytes)
 	/ADMaxLength is for Attribute Maximum length/size in attribute definitions in $AttrDef. (8 bytes)
 
+Variables for $OBJECT_ID:
+	/OIVariable can be some combination of variables from the $OBJECT_ID:
+	/OIGUIDObjectID is the GUID Object ID in $OBJECT_ID. (16 bytes excluding formatting)
+	/OIGUIDBirthVolumeID is the GUID Birth Volume ID in $OBJECT_ID. (16 bytes excluding formatting)
+	/OIGUIDBirthObjectID is the GUID Birth Object ID in $OBJECT_ID. (16 bytes excluding formatting)
+	/OIGUIDBirthDomainID is the GUID Birth Domain ID in $OBJECT_ID. (16 bytes excluding formatting)
+
 Although the tool supports a large amount of fields to be modified, it does not mean it will work after the modification. You may for instance set invalid value that the system automatically detects and fixes (usually deletes the file).
 
 Bear in mind this is an experimental tool and there is a high chance you mess up the target volume and loose data on it. I take no responsibility for any damage done with this tool. Consider it as for educational purposes. That said, from the limited testing done so far, it seems any corruption is limited to the target file/folder only and at worst chkdsk will remove the corrupted file/folder.
@@ -113,6 +122,10 @@ not_indexed = 0x2000
 encrypted = 0x4000
 directory = 0x10000000
 index_view = 0x20000000
+integrity_stream = 0x00008000  
+virtual = 0x00010000  
+no_scrub_data = 0x00020000  
+ea = 0x00040000
 
 /FNNameSpace is the filename namespace:
 POSIX = 0
@@ -136,6 +149,36 @@ MUST_BE_INDEXED = 0x0010 (This attribute must be indexed, and no two attributes 
 MUST_BE_NAMED = 0x0020 (This attribute must be named, and no two attributes may exist with the same name in the same file record segment)
 MUST_BE_RESIDENT = 0x0040 (This attribute must be in the Resident Form)
 LOG_NONRESIDENT = 0x0080 (Modifications to this attribute should be logged even if the attribute is nonresident)
+
+/ADCollationRule can be of the following collation rules:
+COLLATION_BINARY = 0x0000
+COLLATION_FILE_NAME = 0x0001
+COLLATION_UNICODE_STRING = 0x0002
+COLLATION_NTOFS_ULONG = 0x0010
+COLLATION_NTOFS_SID = 0x0011
+COLLATION_NTOFS_SECURITY_HASH = 0x0012
+COLLATION_NTOFS_ULONGS = 0x0013
+
+/RPTag is the tag associated with a $REPARSE_POINT. See https://msdn.microsoft.com/en-us/library/dd541667.aspx
+IO_REPARSE_TAG_RESERVED_ZERO = 0x00000000
+IO_REPARSE_TAG_RESERVED_ONE = 0x00000001
+IO_REPARSE_TAG_DRIVER_EXTENDER = '0x80000005
+IO_REPARSE_TAG_HSM2 = 0x80000006
+IO_REPARSE_TAG_SIS = 0x80000007
+IO_REPARSE_TAG_WIM = 0x80000008
+IO_REPARSE_TAG_CSV = 0x80000009
+IO_REPARSE_TAG_DFS = 0x8000000A
+IO_REPARSE_TAG_FILTER_MANAGER = 0x8000000B
+IO_REPARSE_TAG_DFSR = 0x80000012
+IO_REPARSE_TAG_DEDUP = 0x80000013
+IO_REPARSE_TAG_NFS = 0x80000014
+IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003
+IO_REPARSE_TAG_SYMLINK = 0xA000000C
+IO_REPARSE_TAG_HSM = 0xC0000004
+IO_REPARSE_TAG_FILE_PLACEHOLDER = 0x80000015
+IO_REPARSE_TAG_WOF = 0x80000017
+
+*Program will only accept values in decimal and not hex.
 
 Examples
 PowerMft.exe /Target:c:\bootmgr /Verbose:1
@@ -174,5 +217,14 @@ PowerMft.exe /Target:"D:\        " /FNCoreFileName:"        " /FNFileName:file.e
 PowerMft.exe /Target:D:4 /ADExistingAttrName:$REPARSE_POINT /ADAttrName:$CHKDSK_UNHAPPY
 (Access the Attribute Definition Table in $AttrDef and change the name of $REPARSE_POINT to $CHKDSK_UNHAPPY)
 
-PowerMft.exe /Target:D:4 /ADAttrName:$CHKDSK_UNHAPPY /ADAttrCode:272 /ADDisplayRule:0 /ADCollationRule:0 /ADFlags:128 /ADMinLength:0 /ADMaxLength:16384
-(Access the Attribute Definition Table in $AttrDef and create the new attribute $CHKDSK_UNHAPPY)
+PowerMft.exe /Target:D:4 /ADAttrName:$CHKDSK_UNHAPPY /ADAttrCode:4096 /ADDisplayRule:0 /ADCollationRule:0 /ADFlags:128 /ADMinLength:0 /ADMaxLength:16384
+(Access the Attribute Definition Table in $AttrDef and create the new attribute $CHKDSK_UNHAPPY with attribute code $FIRST_USER_DEFINED_ATTRIBUTE)
+
+PowerMft.exe /Target:D:\test.txt /OIGUIDBirthDomainID:{00112233-4455-6677-8899-AABBCCDDEEFF}
+(Set the GUID BirthDomainID of D:\test.txt to {00112233-4455-6677-8899-AABBCCDDEEFF} in $OBJECT_ID attribute and the $O index in $ObjId)
+
+PowerMft.exe /Target:D:\something /RPSubstituteName:"\??\D:\whatever" /RPPrintName:"D:\whatever"
+(Set the SubstituteName and PrintName in $REPARSE_POINT attribute for D:\something. Name lengths must currently be of same size as original.)
+
+PowerMft.exe /Target:D:\something /HdrSequenceNo:6 /RPPrintName:0x443A5C7768617465766572
+(Set sequence number in header to 6 and the PrintName defined in hex in $REPARSE_POINT attribute for D:\something. Name lengths must currently be of same size as original. Will also update $R index in $Reparse.)

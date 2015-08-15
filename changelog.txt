@@ -1,3 +1,7 @@
+v1.0.0.3
+Added functionality to modify all fields in $PEPARSE_POINT attribute.
+Added check before $I30 parsing.
+
 v1.0.0.2
 Added functionality to modify all fields in $OBJECT_ID attribute.
 

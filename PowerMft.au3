@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Advanced $MFT modification tool for NTFS
 #AutoIt3Wrapper_Res_Description=Advanced $MFT modification tool for NTFS
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.2
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.3
 #AutoIt3Wrapper_Res_LegalCopyright=Joakim Schicht
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #AutoIt3Wrapper_Res_File_Add=C:\tmp\sectorio.sys
@@ -20,9 +20,12 @@
 ; https://github.com/jschicht
 
 ;Global $DoRead=0
+Global $NewRPTag,$NewRPDataLength,$NewRPPadding,$NewRPGUID,$NewRPSubstituteNameOffset,$NewRPSubstituteNameLength,$NewRPPrintNameOffset,$NewRPPrintNameLength,$NewRPSubstituteName,$NewRPPrintName
+Global $DoRPTag=0,$DoRPDataLength=0,$DoRPPadding=0,$DoRPGUID=0,$DoRPSubstituteNameOffset=0,$DoRPSubstituteNameLength=0,$DoRPPrintNameOffset=0,$DoRPPrintNameLength=0,$DoRPSubstituteName=0,$DoRPPrintName=0,$DoReparse=0
 Global $NewOIGUIDObjectID,$NewOIGUIDBirthVolumeID,$NewOIGUIDBirthObjectID,$NewOIGUIDBirthDomainID
-Global $DoOIGUIDObjectID=0,$DoOIGUIDBirthVolumeID=0,$DoOIGUIDBirthObjectID=0,$DoOIGUIDBirthDomainID=0
+Global $DoOIGUIDObjectID=0,$DoOIGUIDBirthVolumeID=0,$DoOIGUIDBirthObjectID=0,$DoOIGUIDBirthDomainID=0,$DoObjId=0,$DoParentI30=0
 Global $OIArrValue[5][1],$OIArrOffset[5][1],$OIArrSize[5][1]
+Global $RPArrValue[11][1],$RPArrOffset[11][1],$RPArrSize[11][1]
 Global $NewAttrDefExistingAttrName,$NewAttrDefAttrName,$NewAttrDefAttrCode,$NewAttrDefDisplayRule,$NewAttrDefCollationRule,$NewAttrDefFlags,$NewAttrDefMinLength,$NewAttrDefMaxLength
 Global $DoAttrDefExistingAttrName=0,$DoAttrDefAttrName=0,$DoAttrDefAttrCode=0,$DoAttrDefDisplayRule=0,$DoAttrDefCollationRule=0,$DoAttrDefFlags=0,$DoAttrDefMinLength=0,$DoAttrDefMaxLength=0,$GlobalAttrDefFlag=0
 Global $GlobalWorkCounter=0, $VerboseOn=0, $FNCoreFileName, $FNForceFileName
@@ -79,7 +82,7 @@ Global Const $tagUNICODESTRING = "ushort Length;ushort MaximumLength;ptr Buffer"
 Global $Timerstart = TimerInit()
 
 ConsoleWrite("Starting PowerMft by Joakim Schicht" & @CRLF)
-ConsoleWrite("Version 1.0.0.2" & @CRLF & @CRLF)
+ConsoleWrite("Version 1.0.0.3" & @CRLF & @CRLF)
 
 If Not $cmdline[0] Then
 	ConsoleWrite("Error: Missing parameters" & @CRLF)
@@ -175,26 +178,28 @@ If $GlobalWorkCounter=0 Then
 	Exit
 EndIf
 
-ConsoleWrite(@CRLF & "Scanning resident $I30 indexes of parent $INDEX_ROOT" & @CRLF)
-ConsoleWrite(@CRLF & "Trying volume offset 0x" & Hex(Int($InfoArrShadowParent[2])) & @CRLF)
-_RawModIndexRoot($TargetDrive,$InfoArrShadowParent[2],$InfoArrShadowMainTarget[0])
+If $DoParentI30 Then
+	ConsoleWrite(@CRLF & "Scanning resident $I30 indexes of parent $INDEX_ROOT" & @CRLF)
+	ConsoleWrite(@CRLF & "Trying volume offset 0x" & Hex(Int($InfoArrShadowParent[2])) & @CRLF)
+	_RawModIndexRoot($TargetDrive,$InfoArrShadowParent[2],$InfoArrShadowMainTarget[0])
 
-;Check for current INDX of parent
-ConsoleWrite(@CRLF & "Scanning non-resident $I30 indexes of parent (INDX records in $INDEX_ALLOCATION)" & @CRLF)
-If IsArray($RawOffsetIndxArray) And Ubound($RawOffsetIndxArray) > 1 Then
-;	_ArrayDisplay($RawOffsetIndxArray,"$RawOffsetIndxArray")
-	For $i = 1 To UBound($RawOffsetIndxArray)-1
-		ConsoleWrite(@CRLF & "Trying volume offset 0x" & Hex(Int($RawOffsetIndxArray[$i][0])) & @CRLF)
-		If (_RawModIndx($RawOffsetIndxArray[$i][0],$RawOffsetIndxArray[$i][2]/4096,$InfoArrShadowParent[0],$InfoArrShadowMainTarget[0])) Then
-			ConsoleWrite("Success patching the non-resident $I30 index in parent" & @CRLF)
-		EndIf
-	Next
-Else
-	ConsoleWrite("There was no INDX records of parent to patch" & @CRLF)
+	;Check for current INDX of parent
+	ConsoleWrite(@CRLF & "Scanning non-resident $I30 indexes of parent (INDX records in $INDEX_ALLOCATION)" & @CRLF)
+	If IsArray($RawOffsetIndxArray) And Ubound($RawOffsetIndxArray) > 1 Then
+	;	_ArrayDisplay($RawOffsetIndxArray,"$RawOffsetIndxArray")
+		For $i = 1 To UBound($RawOffsetIndxArray)-1
+			ConsoleWrite(@CRLF & "Trying volume offset 0x" & Hex(Int($RawOffsetIndxArray[$i][0])) & @CRLF)
+			If (_RawModIndx($RawOffsetIndxArray[$i][0],$RawOffsetIndxArray[$i][2]/4096,$InfoArrShadowParent[0],$InfoArrShadowMainTarget[0])) Then
+				ConsoleWrite("Success patching the non-resident $I30 index in parent" & @CRLF)
+			EndIf
+		Next
+	Else
+		ConsoleWrite("There was no INDX records of parent to patch" & @CRLF)
+	EndIf
 EndIf
 
 ;Check the $O index in $ObjId
-If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Or $DoOIGUIDObjectID Or $DoOIGUIDBirthVolumeID Or $DoOIGUIDBirthObjectID Or $DoOIGUIDBirthDomainID Then
+If $DoObjId Then
 	$RetRec = _FindFileMFTRecord($TargetDrive,25)
 	If Not IsArray($RetRec) Then
 		ConsoleWrite("Error: Could not locate $ObjId." & @CRLF)
@@ -217,7 +222,7 @@ If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Or $DoOIGUIDObjectID Or $DoOIGUIDBi
 EndIf
 
 ;Check the $R index in $Reparse
-If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Then
+If $DoReparse Then
 	$RetRec = _FindFileMFTRecord($TargetDrive,26)
 	If Not IsArray($RetRec) Then
 		ConsoleWrite("Error: Could not locate $Reparse." & @CRLF)
@@ -1291,24 +1296,7 @@ Func _Prep($TargetDevice,$IndexNumber,$TargetFileName)
 	Global $IndxRTimeFromParentCurrentArr = $IndxRTimeFromParentArr
 	Return 1
 EndFunc
-#cs
-Func _ExtractSystemfile($TargetFile)
-	Global $DataQ[1], $RUN_VCN[1], $RUN_Clusters[1]
-	If StringLen($TargetDrive)=1 Then $TargetDrive=$TargetDrive&":"
-	_ReadBootSector($TargetDrive)
-	$BytesPerCluster = $SectorsPerCluster*$BytesPerSector
-	$MFTEntry = _FindMFT($TargetDrive,0)
-	_DecodeMFTRecord($TargetDrive,$MFTEntry,0)
-	_DecodeDataQEntry($DataQ[1])
-	$MFTSize = $DATA_RealSize
-	Global $RUN_VCN[1], $RUN_Clusters[1]
-	_ExtractDataRuns()
-	$MFT_RUN_VCN = $RUN_VCN
-	$MFT_RUN_Clusters = $RUN_Clusters
-	_ExtractSingleFile(Int($TargetFile,2))
-	_WinAPI_CloseHandle($hDisk)
-EndFunc
-#ce
+
 Func _ExtractSingleFile($MFTReferenceNumber)
 	Global $DataQ[1]				;clear array
 	$RetRec = _FindFileMFTRecord($TargetDrive,$MFTReferenceNumber)
@@ -1538,7 +1526,7 @@ Global $DataQ[1],$Mode2Data=""
 Global $IRArr[12][2],$IndxArr[20][2]
 Global $HdrArrValue[17][2], $HdrArrOffset[17][2], $HdrArrSize[17][2]
 Global $OIArrValue[5][2],$OIArrOffset[5][2],$OIArrSize[5][2]
-
+;ConsoleWrite("_DecodeMFTRecord() mode: " & $MFTMode & @CRLF)
 
 _SetArrays()
 $HEADER_RecordRealSize = ""
@@ -1680,7 +1668,7 @@ While 1
 		Case $AttributeType = $STANDARD_INFORMATION
 ;			$STANDARD_INFORMATION_ON = "TRUE"
 			$SI_Number += 1
-			_Get_StandardInformation($MFTEntry,$AttributeOffset,$AttributeSize*2,$SI_Number)
+			If Not $MFTMode Then _Get_StandardInformation($MFTEntry,$AttributeOffset,$AttributeSize*2,$SI_Number)
 		Case $AttributeType = $ATTRIBUTE_LIST
 ;			$ATTRIBUTE_LIST_ON = "TRUE"
 			$ATTRIBLIST_Number += 1
@@ -1717,7 +1705,7 @@ While 1
 			If $IsRawShadowCopy Then Return 1 ;We are only interested in ref and name for comparison.
 ;			$OBJECT_ID_ON = "TRUE"
 			$OBJID_Number += 1
-			_Get_ObjectID($MFTEntry,$AttributeOffset,$AttributeSize,$OBJID_Number)
+			If Not $MFTMode Then _Get_ObjectID($MFTEntry,$AttributeOffset,$AttributeSize,$OBJID_Number)
 		Case $AttributeType = $SECURITY_DESCRIPTOR
 			If $IsRawShadowCopy Then Return 1 ;We are only interested in ref and name for comparison.
 ;			$SECURITY_DESCRIPTOR_ON = "TRUE"
@@ -1779,6 +1767,7 @@ While 1
 			If $IsRawShadowCopy Then Return 1 ;We are only interested in ref and name for comparison.
 ;			$REPARSE_POINT_ON = "TRUE"
 			$REPARSEPOINT_Number += 1
+			If Not $MFTMode Then _Get_ReparsePoint($MFTEntry,$AttributeOffset,$AttributeSize,$REPARSEPOINT_Number)
 		Case $AttributeType = $EA_INFORMATION
 			If $IsRawShadowCopy Then Return 1 ;We are only interested in ref and name for comparison.
 ;			$EA_INFORMATION_ON = "TRUE"
@@ -4930,7 +4919,7 @@ Func _RawModMft($DiskOffset,$TargetRef)
 		ConsoleWrite(_HexEncode($MFTRecordDump) & @crlf)
 	EndIf
 
-	Local $WorkCounter1=0,$WorkCounter2=0,$WorkCounter3=0,$WorkCounter4=0
+	Local $WorkCounter1=0,$WorkCounter2=0,$WorkCounter3=0,$WorkCounter4=0,$WorkCounter5=0
 
 	If $HdrArrValue[1][1] = 48 Then
 		$IsNewStyle = 1
@@ -5180,13 +5169,86 @@ Func _RawModMft($DiskOffset,$TargetRef)
 			$DoOIGUIDBirthDomainID = 0
 		EndIf
 	EndIf
+	;$REPARSE_POINT
+;Global $NewRPTag,$NewRPDataLength,$NewRPPadding,$NewRPSubstituteNameOffset,$NewRPSubstituteNameLength,$NewRPPrintNameOffset,$NewRPPrintNameLength,$NewRPSubstituteName,$NewRPPrintName
+;Global $DoRPTag,$DoRPDataLength,$DoRPPadding,$DoRPSubstituteNameOffset,$DoRPSubstituteNameLength,$DoRPPrintNameOffset,$DoRPPrintNameLength,$DoRPSubstituteName,$DoRPPrintName
+	If $DoRPTag Then
+		$WorkCounter5+=1
+		$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[1][1]-1) & $NewRPTag & StringMid($MFTRecordDump,$RPArrOffset[1][1]+StringLen($NewRPTag),($MFT_Record_Size*2)-$RPArrOffset[1][1])
+	EndIf
+	If $DoRPDataLength Then
+		$WorkCounter5+=1
+		$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[2][1]-1) & $NewRPDataLength & StringMid($MFTRecordDump,$RPArrOffset[2][1]+StringLen($NewRPDataLength),($MFT_Record_Size*2)-$RPArrOffset[2][1])
+	EndIf
+	If $DoRPPadding Then
+		$WorkCounter5+=1
+		$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[3][1]-1) & $NewRPPadding & StringMid($MFTRecordDump,$RPArrOffset[3][1]+StringLen($NewRPPadding),($MFT_Record_Size*2)-$RPArrOffset[3][1])
+	EndIf
+	If $DoRPGUID Then
+		If $RPArrValue[4][1] = 32 Then
+			$WorkCounter5+=1
+			$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[4][1]-1) & $NewRPGUID & StringMid($MFTRecordDump,$RPArrOffset[4][1]+StringLen($NewRPGUID),($MFT_Record_Size*2)-$RPArrOffset[4][1])
+		Else
+			$DoRPGUID = 0
+			ConsoleWrite("Warning: Can't inject a GUID when it is not present in source in $REPARSE_POINT. Skipping it." & @CRLF)
+		EndIf
+	EndIf
+	If $DoRPSubstituteNameOffset Then
+		$WorkCounter5+=1
+		$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[5][1]-1) & $NewRPSubstituteNameOffset & StringMid($MFTRecordDump,$RPArrOffset[5][1]+StringLen($NewRPSubstituteNameOffset),($MFT_Record_Size*2)-$RPArrOffset[5][1])
+	EndIf
+	If $DoRPSubstituteNameLength Then
+		$WorkCounter5+=1
+		$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[6][1]-1) & $NewRPSubstituteNameLength & StringMid($MFTRecordDump,$RPArrOffset[6][1]+StringLen($NewRPSubstituteNameLength),($MFT_Record_Size*2)-$RPArrOffset[6][1])
+	EndIf
+	If $DoRPPrintNameOffset Then
+		$WorkCounter5+=1
+		$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[7][1]-1) & $NewRPPrintNameOffset & StringMid($MFTRecordDump,$RPArrOffset[7][1]+StringLen($NewRPPrintNameOffset),($MFT_Record_Size*2)-$RPArrOffset[7][1])
+	EndIf
+	If $DoRPPrintNameLength Then
+		$WorkCounter5+=1
+		$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[8][1]-1) & $NewRPPrintNameLength & StringMid($MFTRecordDump,$RPArrOffset[8][1]+StringLen($NewRPPrintNameLength),($MFT_Record_Size*2)-$RPArrOffset[8][1])
+	EndIf
+	If $DoRPSubstituteName Then
+		If (StringLen($NewRPSubstituteName)/2 = $RPArrValue[6][1]) Then
+			$WorkCounter5+=1
+			$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[9][1]-1) & $NewRPSubstituteName & StringMid($MFTRecordDump,$RPArrOffset[9][1]+StringLen($NewRPSubstituteName),($MFT_Record_Size*2)-$RPArrOffset[9][1])
+		Else
+			ConsoleWrite("Warning: The length of target Reparse points SubstituteName " & $RPArrValue[6][1] & " differs from the one found in $REPARSE_POINT: " & $RPArrValue[9][1] & ". Skipping it." & @CRLF)
+			$DoRPSubstituteName=0
+		EndIf
+	EndIf
+	If $DoRPPrintName Then
+		If (StringLen($NewRPPrintName)/2 = $RPArrValue[8][1]) Then
+			$WorkCounter5+=1
+			$MFTRecordDump = StringMid($MFTRecordDump,1,$RPArrOffset[10][1]-1) & $NewRPPrintName & StringMid($MFTRecordDump,$RPArrOffset[10][1]+StringLen($NewRPPrintName),($MFT_Record_Size*2)-$RPArrOffset[10][1])
+		Else
+			ConsoleWrite("Warning: The length of target Reparse points PrintName " & $RPArrValue[8][1] & " differs from the one found in $REPARSE_POINT: " & $RPArrValue[10][1] & ". Skipping it." & @CRLF)
+			$DoRPPrintName=0
+		EndIf
+	EndIf
+;	_ArrayDisplay($RPArrValue,"$RPArrValue")
+;	_ArrayDisplay($RPArrOffset,"$RPArrOffset")
 
-	If ($WorkCounter1=0 And $WorkCounter2=0 And $WorkCounter3=0 And $WorkCounter4=0) Then
+
+	If ($WorkCounter1=0 And $WorkCounter2=0 And $WorkCounter3=0 And $WorkCounter4=0 And $WorkCounter5=0) Then
 		$GlobalWorkCounter=0
 		ConsoleWrite("Nothing to do in MFT record." & @crlf)
 		Return
 	Else
-		$GlobalWorkCounter = $WorkCounter1+$WorkCounter2+$WorkCounter3+$WorkCounter4
+		$GlobalWorkCounter = $WorkCounter1+$WorkCounter2+$WorkCounter3+$WorkCounter4+$WorkCounter5
+	EndIf
+
+	If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Or $DoOIGUIDObjectID Or $DoOIGUIDBirthVolumeID Or $DoOIGUIDBirthObjectID Or $DoOIGUIDBirthDomainID Then
+		$DoObjId = 1
+	EndIf
+
+	If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Or $DoRPTag Then
+		$DoReparse = 1
+	EndIf
+
+	If $DoHdrSequenceNo Or $DoHdrMFTREcordNumber Or $DoSICTime Or $DoSIATime Or $DoSIMTime Or $DoSIRTime Or $DoSIFilePermission Or $DoFNParentReferenceNo Or $DoFNParentSequenceNo Or $DoFNAllocSize Or $DoFNRealSize Or $DoFNFlags Or $DoFNNameLength Or $DoFNNameSpace Or $DoFNFilename Then
+		$DoParentI30 = 1
 	EndIf
 
 	If $VerboseOn Then
@@ -7213,7 +7275,7 @@ Func _ParseParentIndexRoot2($TargetDevice,$TargetRef,$Entry,$IR_Offset,$IR_Size)
 EndFunc
 
 Func _PrintHelp()
-	ConsoleWrite("PowerMft.exe /Target:TargetPath /Verbose:{0|1} /HdrVariable:{value} /SIVariable:{value} /FNVariable:{value} /ADVariable:{value} /OIVariable:{value}" & @CRLF)
+	ConsoleWrite("PowerMft.exe /Target:TargetPath /Verbose:{0|1} /HdrVariable:{value} /SIVariable:{value} /FNVariable:{value} /ADVariable:{value} /OIVariable:{value} /RPVariable:{value}" & @CRLF)
 	ConsoleWrite("	/Target can be any file or directory, and may be specified as filename with full path or Volume+MftRef." & @CRLF)
 	ConsoleWrite("	/Verbose is verbosity of output flag. Set to 0 or 1. Default 0." & @CRLF)
 	ConsoleWrite(@CRLF)
@@ -7283,6 +7345,18 @@ Func _PrintHelp()
 	ConsoleWrite("	/OIGUIDBirthObjectID is the GUID Birth Object ID in $OBJECT_ID. (16 bytes excluding formatting)" & @CRLF)
 	ConsoleWrite("	/OIGUIDBirthDomainID is the GUID Birth Domain ID in $OBJECT_ID. (16 bytes excluding formatting)" & @CRLF)
 	ConsoleWrite(@CRLF)
+	ConsoleWrite("	/RPVariable can be some combination of variables from the $REPARSE_POINT attribute:" & @CRLF)
+	ConsoleWrite("	/RPTag is the tag code. See readme.txt. (4 bytes)" & @CRLF)
+	ConsoleWrite("	/RPDataLength is the total size of the remaining data in attribute after RPPadding. (8 bytes + RPSubstituteNameLength + RPPrintNameLength)" & @CRLF)
+	ConsoleWrite("	/RPPadding is a 2 byte padding. (2 bytes)" & @CRLF)
+	ConsoleWrite("	/RPGuid is a mandatory GUID for use with non-Microsoft tags. (16 bytes)" & @CRLF)
+	ConsoleWrite("	/RPSubstituteNameOffset is the offset to SubstituteName in $REPARSE_POINT (2 bytes)" & @CRLF)
+	ConsoleWrite("	/RPSubstituteNameLength is the number of printable characters SubstituteName in $REPARSE_POINT (2 bytes)" & @CRLF)
+	ConsoleWrite("	/RPPrintNameOffset is the offset to PrintName in $REPARSE_POINT (2 bytes)" & @CRLF)
+	ConsoleWrite("	/RPPrintNameLength is the number of printable characters in PrintName in $REPARSE_POINT (2 bytes)" & @CRLF)
+	ConsoleWrite('	/RPSubstituteName is the actual SubstituteName. For instance "\??\E:\whatever" (RPSubstituteNameLength - 2 bytes per char)' & @CRLF)
+	ConsoleWrite('	/RPPrintName is the actual PrintName. For instance "E:\whatever" (RPPrintNameLength - 2 bytes per char)' & @CRLF)
+	ConsoleWrite(@CRLF)
 	ConsoleWrite("Examples:" & @CRLF & @CRLF)
 	ConsoleWrite("PowerMft.exe /Target:c:\bootmgr /Verbose:1" & @CRLF)
 	ConsoleWrite("(Will just dump the MFT record for the bootmgr file on volume c)" & @CRLF & @CRLF)
@@ -7312,6 +7386,10 @@ Func _PrintHelp()
 	ConsoleWrite('(Access the Attribute Definition Table in $AttrDef and create the new attribute $CHKDSK_UNHAPPY with attribute code $FIRST_USER_DEFINED_ATTRIBUTE)' & @CRLF & @CRLF)
 	ConsoleWrite('PowerMft.exe /Target:D:\test.txt /OIGUIDBirthDomainID:{00112233-4455-6677-8899-AABBCCDDEEFF}' & @CRLF)
 	ConsoleWrite("(Set the GUID BirthDomainID of D:\test.txt to {00112233-4455-6677-8899-AABBCCDDEEFF} in $OBJECT_ID attribute and the $O index in $ObjId)" & @CRLF & @CRLF)
+	ConsoleWrite('PowerMft.exe /Target:D:\something /RPSubstituteName:"\??\D:\whatever" /RPPrintName:"D:\whatever"' & @CRLF)
+	ConsoleWrite("(Set the SubstituteName and PrintName in $REPARSE_POINT attribute for D:\something. Name lengths must currently be of same size as original.)" & @CRLF & @CRLF)
+	ConsoleWrite('PowerMft.exe /Target:D:\something /HdrSequenceNo:6 /RPPrintName:0x443A5C7768617465766572' & @CRLF)
+	ConsoleWrite("(Set sequence number in header to 6 and the PrintName defined in hex in $REPARSE_POINT attribute for D:\something. Name lengths must currently be of same size as original. Will also update $R index in $Reparse.)" & @CRLF & @CRLF)
 EndFunc
 
 Func _ValidateInput()
@@ -7398,6 +7476,17 @@ Func _ValidateInput()
 		If StringLeft($cmdline[$i],21) = "/OIGUIDBirthVolumeID:" Then $NewOIGUIDBirthVolumeID = StringMid($cmdline[$i],22)
 		If StringLeft($cmdline[$i],21) = "/OIGUIDBirthObjectID:" Then $NewOIGUIDBirthObjectID = StringMid($cmdline[$i],22)
 		If StringLeft($cmdline[$i],21) = "/OIGUIDBirthDomainID:" Then $NewOIGUIDBirthDomainID = StringMid($cmdline[$i],22)
+		;$REPARSE_POINT
+		If StringLeft($cmdline[$i],7) = "/RPTag:" Then $NewRPTag = StringMid($cmdline[$i],8)
+		If StringLeft($cmdline[$i],14) = "/RPDataLength:" Then $NewRPDataLength = Int(StringMid($cmdline[$i],15))
+		If StringLeft($cmdline[$i],11) = "/RPPadding:" Then $NewRPPadding = StringMid($cmdline[$i],12)
+		If StringLeft($cmdline[$i],8) = "/RPGuid:" Then $NewRPPadding = StringMid($cmdline[$i],9)
+		If StringLeft($cmdline[$i],24) = "/RPSubstituteNameOffset:" Then $NewRPSubstituteNameOffset = Int(StringMid($cmdline[$i],25))
+		If StringLeft($cmdline[$i],25) = "/RPSubstituteNameLength:" Then $NewRPSubstituteNameLength = Int(StringMid($cmdline[$i],26))
+		If StringLeft($cmdline[$i],19) = "/RPPrintNameOffset:" Then $NewRPPrintNameOffset = Int(StringMid($cmdline[$i],20))
+		If StringLeft($cmdline[$i],19) = "/RPPrintNameLength:" Then $NewRPPrintNameLength = Int(StringMid($cmdline[$i],20))
+		If StringLeft($cmdline[$i],18) = "/RPSubstituteName:" Then $NewRPSubstituteName = StringMid($cmdline[$i],19)
+		If StringLeft($cmdline[$i],13) = "/RPPrintName:" Then $NewRPPrintName = StringMid($cmdline[$i],14)
 
 	Next
 
@@ -7955,6 +8044,100 @@ Func _ValidateInput()
 			ConsoleWrite("Error: /OIGUIDBirthDomainID was incorrectly formatted: " & $NewOIGUIDBirthDomainID & @CRLF)
 		EndIf
 	EndIf
+
+	;$REPARSE_POINT
+	If StringLen($NewRPTag) > 0 Then
+		ConsoleWrite("$NewRPTag: " & $NewRPTag & @CRLF)
+		$DoRPTag = 1
+		$NewRPTag = _SwapEndian(Hex($NewRPTag,8))
+	EndIf
+	If StringLen($NewRPDataLength) > 0 Then
+		ConsoleWrite("$NewRPDataLength: " & $NewRPDataLength & @CRLF)
+		$DoRPDataLength = 1
+		$NewRPDataLength = _SwapEndian(Hex($NewRPDataLength,4))
+	EndIf
+	If StringLen($NewRPPadding) > 0 Then
+		If StringLen($NewRPPadding) = 4 Then
+			ConsoleWrite("$NewRPPadding: " & $NewRPPadding & @CRLF)
+			$DoRPPadding = 1
+		Else
+			ConsoleWrite("Error: /RPPadding was of incorrect size: " & $NewRPPadding & @CRLF)
+		EndIf
+	EndIf
+	If StringLen($NewRPGUID) > 0 Then
+		If StringLen($NewRPGUID) = 38 Then
+			ConsoleWrite("$NewRPGUID: " & $NewRPGUID & @CRLF)
+			$DoRPGuid = 1
+			$NewRPGUID = _GuidToHexString($NewRPGUID)
+		Else
+			ConsoleWrite("Error: /RPGuid was incorrectly formatted: " & $NewRPGUID & @CRLF)
+		EndIf
+	EndIf
+	If StringLen($NewRPSubstituteNameOffset) > 0 Then
+		ConsoleWrite("$NewRPSubstituteNameOffset: " & $NewRPSubstituteNameOffset & @CRLF)
+		$DoRPSubstituteNameOffset = 1
+		$NewRPSubstituteNameOffset = _SwapEndian(Hex($NewRPSubstituteNameOffset,4))
+	EndIf
+	If StringLen($NewRPSubstituteNameLength) > 0 Then
+		ConsoleWrite("$NewRPSubstituteNameLength: " & $NewRPSubstituteNameLength & @CRLF)
+		$DoRPSubstituteNameLength = 1
+		$NewRPSubstituteNameLength = _SwapEndian(Hex($NewRPSubstituteNameLength,4))
+	EndIf
+	If StringLen($NewRPPrintNameOffset) > 0 Then
+		ConsoleWrite("$NewRPPrintNameOffset: " & $NewRPPrintNameOffset & @CRLF)
+		$DoRPPrintNameOffset = 1
+		$NewRPPrintNameOffset = _SwapEndian(Hex($NewRPPrintNameOffset,4))
+	EndIf
+	If StringLen($NewRPPrintNameLength) > 0 Then
+		ConsoleWrite("$NewRPPrintNameLength: " & $NewRPPrintNameLength & @CRLF)
+		$DoRPPrintNameLength = 1
+		$NewRPPrintNameLength = _SwapEndian(Hex($NewRPPrintNameLength,4))
+	EndIf
+	If StringLen($NewRPSubstituteName) > 0 Then
+		ConsoleWrite("$NewRPSubstituteName: " & $NewRPSubstituteName & @CRLF)
+		$DoRPSubstituteName = 1
+		Local $TmpFileName=""
+		If StringLeft($NewRPSubstituteName,2) = "0x" Then
+			$NewRPSubstituteName = StringMid($NewRPSubstituteName,3)
+			If Not StringIsXDigit($NewRPSubstituteName) Then
+				ConsoleWrite("Error: Target filename was not correctly set in hex: " & $NewRPSubstituteName & @CRLF & @CRLF)
+				$NewRPSubstituteName = ""
+			EndIf
+			If Mod(StringLen($NewRPSubstituteName),4) Then
+				ConsoleWrite("Error: Target filename was not correctly set. Each character should be 2 bytes: " & $NewRPSubstituteName & @CRLF & @CRLF)
+				$NewRPSubstituteName = ""
+			EndIf
+		Else
+			$LocalFileNameArray = StringSplit($NewRPSubstituteName,"")
+			For $i = 1 To $LocalFileNameArray[0]
+				$TmpFileName &= _SwapEndian(Hex(Asc($LocalFileNameArray[$i]),4))
+			Next
+			$NewRPSubstituteName = $TmpFileName
+		EndIf
+	EndIf
+	If StringLen($NewRPPrintName) > 0 Then
+		ConsoleWrite("$NewRPPrintName: " & $NewRPPrintName & @CRLF)
+		$DoRPPrintName = 1
+		Local $TmpFileName=""
+		If StringLeft($NewRPPrintName,2) = "0x" Then
+			$NewRPPrintName = StringMid($NewRPPrintName,3)
+			If Not StringIsXDigit($NewRPPrintName) Then
+				ConsoleWrite("Error: Target filename was not correctly set in hex: " & $NewRPPrintName & @CRLF & @CRLF)
+				$NewRPPrintName = ""
+			EndIf
+			If Mod(StringLen($NewRPPrintName),4) Then
+				ConsoleWrite("Error: Target filename was not correctly set. Each character should be 2 bytes: " & $NewRPPrintName & @CRLF & @CRLF)
+				$NewRPPrintName = ""
+			EndIf
+		Else
+			$LocalFileNameArray = StringSplit($NewRPPrintName,"")
+			For $i = 1 To $LocalFileNameArray[0]
+				$TmpFileName &= _SwapEndian(Hex(Asc($LocalFileNameArray[$i]),4))
+			Next
+			$NewRPPrintName = $TmpFileName
+		EndIf
+	EndIf
+
 
 	ConsoleWrite(@CRLF)
 EndFunc
@@ -9025,6 +9208,10 @@ Func _Preparse_Reparse($TargetDevice,$DiskOffset,$TargetRef)
 		If $TargetRef = $GlobalReparseR_KeyMftRefOfReparsePoint[$i][1] Then
 			If $GlobalReparseR_DataOffset[$i][1] = 0 Then ContinueLoop ;Probably something wrong
 			$EntryMatchCounter += 1
+			If $DoRPTag Then
+				$WorkCounter+=1
+				$MFTEntry = StringMid($MFTEntry,1,$GlobalReparseR_KeyReparseTag[$i][0]-1) & $NewRPTag & StringMid($MFTEntry,$GlobalReparseR_KeyReparseTag[$i][0]+StringLen($NewRPTag),($INDX_Record_Size*2)-$GlobalReparseR_KeyReparseTag[$i][0])
+			EndIf
 			If $DoHdrSequenceNo Then
 				$WorkCounter+=1
 				$MFTEntry = StringMid($MFTEntry,1,$GlobalReparseR_KeyMftRefSeqNoOfReparsePoint[$i][0]-1) & $NewHdr_SequenceNo & StringMid($MFTEntry,$GlobalReparseR_KeyMftRefSeqNoOfReparsePoint[$i][0]+4,($INDX_Record_Size*2)-$GlobalReparseR_KeyMftRefSeqNoOfReparsePoint[$i][0])
@@ -9035,6 +9222,7 @@ Func _Preparse_Reparse($TargetDevice,$DiskOffset,$TargetRef)
 			EndIf
 		EndIf
 	Next
+;	_ArrayDisplay($GlobalReparseR_KeyReparseTag,"$GlobalReparseR_KeyReparseTag")
 ;	_ArrayDisplay($GlobalReparseR_KeyMftRefOfReparsePoint,"$GlobalReparseR_KeyMftRefOfReparsePoint")
 ;	_ArrayDisplay($GlobalReparseR_KeyMftRefSeqNoOfReparsePoint,"$GlobalReparseR_KeyMftRefSeqNoOfReparsePoint")
 
@@ -9049,7 +9237,7 @@ Func _Preparse_Reparse($TargetDevice,$DiskOffset,$TargetRef)
 		ConsoleWrite("Patched MFT record of $Reparse:" & @crlf)
 		ConsoleWrite(_HexEncode($MFTEntry) & @crlf)
 	EndIf
-;	Return
+	Return
 
 	$OffsetToUsa = 3+($UpdSeqArrOffset*2) ;offset of usa ()
 	If $MFT_Record_Size = 1024 Then
@@ -9273,6 +9461,10 @@ Func _RawModIndxR($DiskOffset,$NumberOfRecords,$TargetRef)
 			If $TargetRef = $LocalReparseR_KeyMftRefOfReparsePoint[$i][1] Then
 				If $LocalReparseR_DataOffset[$i][1] = 0 Then ContinueLoop ;Probably something wrong
 				$Counter+=1
+				If $DoRPTag Then
+					$WorkCounter+=1
+					$Entry = StringMid($Entry,1,$LocalReparseR_KeyReparseTag[$i][0]-1) & $NewRPTag & StringMid($Entry,$LocalReparseR_KeyReparseTag[$i][0]+StringLen($NewRPTag),($INDX_Record_Size*2)-$LocalReparseR_KeyReparseTag[$i][0])
+				EndIf
 				If $DoHdrSequenceNo Then
 					$WorkCounter+=1
 					$Entry = StringMid($Entry,1,$LocalReparseR_KeyMftRefSeqNoOfReparsePoint[$i][0]-1) & $NewHdr_SequenceNo & StringMid($Entry,$LocalReparseR_KeyMftRefSeqNoOfReparsePoint[$i][0]+4,($INDX_Record_Size*2)-$LocalReparseR_KeyMftRefSeqNoOfReparsePoint[$i][0])
@@ -9384,21 +9576,16 @@ Func _GetReparseType($ReparseType)
 			Return 'SYMLINK'
 		Case $ReparseType = '0xC0000004'
 			Return 'HSM'
+		Case $ReparseType = '0x80000015'
+			Return 'FILE_PLACEHOLDER'
+		Case $ReparseType = '0x80000017'
+			Return 'WOF'
 		Case Else
 			Return 'UNKNOWN(' & $ReparseType & ')'
 	EndSelect
 EndFunc
 
 Func _DecodeCollationRules($CRinput)
-#cs
-	COLLATION_BINARY		= const_cpu_to_le32(0x00),
-	COLLATION_FILENAME		= const_cpu_to_le32(0x01),
-	COLLATION_UNICODE_STRING	= const_cpu_to_le32(0x02),
-	COLLATION_NTOFS_ULONG		= const_cpu_to_le32(0x10),
-	COLLATION_NTOFS_SID		= const_cpu_to_le32(0x11),
-	COLLATION_NTOFS_SECURITY_HASH	= const_cpu_to_le32(0x12),
-	COLLATION_NTOFS_ULONGS		= const_cpu_to_le32(0x13),
-#ce
 	Select
 		Case $CRinput = 0x0000
 			Return 'COLLATION_BINARY'
@@ -9956,17 +10143,106 @@ Func _HexToGuidStr($input,$mode)
 	Return $OutStr
 EndFunc
 
-Func StringFromGUID($pGUID)
-    Local $aResult = DllCall("ole32.dll", "int", "StringFromGUID2", "struct*", $pGUID, "wstr", "", "int", 40)
-    If @error Then Return SetError(@error, @extended, "")
-    Return SetExtended($aResult[0], $aResult[2])
-EndFunc
+Func _Get_ReparsePoint($Entry,$ReparsePoint_Offset,$ReparsePoint_Size,$ReparsePoint_Number)
+	Local $LocalAttributeOffset = 1,$GuidPresent=0,$ReparseType,$ReparseDataLength,$ReparsePadding,$ReparseGuid,$ReparseGuidSize,$ReparseSubstituteNameOffset,$ReparseSubstituteNameLength,$ReparsePrintNameOffset,$ReparsePrintNameLength,$ReparseSubstituteName,$ReparsePrintName
+	Redim $RPArrValue[11][$ReparsePoint_Number+1]
+	Redim $RPArrOffset[11][$ReparsePoint_Number+1]
+	Redim $RPArrSize[11][$ReparsePoint_Number+1]
+	$Entry = StringMid($Entry,$ReparsePoint_Offset+48,$ReparsePoint_Size*2)
+;	ConsoleWrite("_Get_ReparsePoint():" & @crlf)
+;	ConsoleWrite(_HexEncode("0x"&$Entry) & @crlf)
+	$ReparseType = StringMid($Entry,$LocalAttributeOffset,8)
+	$ReparseType = _SwapEndian($ReparseType)
+	If Dec(StringMid($ReparseType,1,2)) < 128 Then ;Non-Microsoft - GUID exist
+		$GuidPresent = 1
+	EndIf
+	$ReparseType = "0x" & $ReparseType
+	$ReparseType = _GetReparseType($ReparseType)
+	$ReparseDataLength = StringMid($Entry,$LocalAttributeOffset+8,4)
+	$ReparseDataLength = Dec(_SwapEndian($ReparseDataLength),2)
+	$ReparsePadding = StringMid($Entry,$LocalAttributeOffset+12,4)
+	If $GuidPresent Then
+		$ReparseGuidSize = 32
+		$ReparseGuid = StringMid($Entry,$LocalAttributeOffset+16,32)
+		$ReparseGuid = _HexToGuidStr($ReparseGuid,1)
+		$ReparseData = StringMid($Entry,$LocalAttributeOffset+48,$ReparseDataLength*2)
+	Else
+		$ReparseGuidSize = 0
+		$ReparseData = StringMid($Entry,$LocalAttributeOffset+16,$ReparseDataLength*2)
+	EndIf
+;	ConsoleWrite("$ReparseData:" & @crlf)
+;	ConsoleWrite(_HexEncode("0x"&$ReparseData) & @crlf)
+	$ReparseSubstituteNameOffset = StringMid($ReparseData,1,4)
+;	ConsoleWrite("$ReparseSubstituteNameOffset: " & $ReparseSubstituteNameOffset & @crlf)
+	$ReparseSubstituteNameOffset = Dec(_SwapEndian($ReparseSubstituteNameOffset),2)
+	$ReparseSubstituteNameLength = StringMid($ReparseData,5,4)
+;	ConsoleWrite("$ReparseSubstituteNameLength: " & $ReparseSubstituteNameLength & @crlf)
+	$ReparseSubstituteNameLength = Dec(_SwapEndian($ReparseSubstituteNameLength),2)
+	$ReparsePrintNameOffset = StringMid($ReparseData,9,4)
+;	ConsoleWrite("$ReparsePrintNameOffset: " & $ReparsePrintNameOffset & @crlf)
+	$ReparsePrintNameOffset = Dec(_SwapEndian($ReparsePrintNameOffset),2)
+	$ReparsePrintNameLength = StringMid($ReparseData,13,4)
+;	ConsoleWrite("$ReparsePrintNameLength: " & $ReparsePrintNameLength & @crlf)
+	$ReparsePrintNameLength = Dec(_SwapEndian($ReparsePrintNameLength),2)
+	;Values
+	$RPArrValue[0][$ReparsePoint_Number] = "Field Value"
+	$RPArrValue[1][$ReparsePoint_Number] = $ReparseType
+	$RPArrValue[2][$ReparsePoint_Number] = $ReparseDataLength
+	$RPArrValue[3][$ReparsePoint_Number] = $ReparsePadding
+	$RPArrValue[4][$ReparsePoint_Number] = $ReparseGuid
+	;Offsets
+	$RPArrOffset[0][$ReparsePoint_Number] = "Field Offset"
+	$RPArrOffset[1][$ReparsePoint_Number] = $ReparsePoint_Offset+48
+	$RPArrOffset[2][$ReparsePoint_Number] = $ReparsePoint_Offset+48+8+8
+	$RPArrOffset[3][$ReparsePoint_Number] = $ReparsePoint_Offset+48+12+12
+	$RPArrOffset[4][$ReparsePoint_Number] = $ReparsePoint_Offset+48+16+16
 
-Func StringFromGUID2($HexGUID)
-	$Buff = DllStructCreate("byte guid[16];")
-	DllStructSetData($Buff,"guid","0x"&$HexGUID)
-    Local $aResult = DllCall("ole32.dll", "int", "StringFromGUID2", "struct*", DllStructGetPtr($Buff), "wstr", "", "int", 40)
-    If @error Then Return SetError(@error, @extended, "")
-    Return SetExtended($aResult[0], $aResult[2])
+	$ReparsePoint_Offset += $ReparseGuidSize
+	;Values
+	$RPArrValue[5][$ReparsePoint_Number] = $ReparseSubstituteNameOffset
+	$RPArrValue[6][$ReparsePoint_Number] = $ReparseSubstituteNameLength
+	$RPArrValue[7][$ReparsePoint_Number] = $ReparsePrintNameOffset
+	$RPArrValue[8][$ReparsePoint_Number] = $ReparsePrintNameLength
+	;Offsets
+	$RPArrOffset[5][$ReparsePoint_Number] = $ReparsePoint_Offset+64+$ReparseGuidSize+16
+	$RPArrOffset[6][$ReparsePoint_Number] = $ReparsePoint_Offset+64+$ReparseGuidSize+20
+	$RPArrOffset[7][$ReparsePoint_Number] = $ReparsePoint_Offset+64+$ReparseGuidSize+24
+	$RPArrOffset[8][$ReparsePoint_Number] = $ReparsePoint_Offset+64+$ReparseGuidSize+28
+	;Sizes
+	$RPArrSize[0][$ReparsePoint_Number] = "Field Size"
+	$RPArrSize[1][$ReparsePoint_Number] = 8
+	$RPArrSize[2][$ReparsePoint_Number] = 4
+	$RPArrSize[3][$ReparsePoint_Number] = 4
+	$RPArrSize[4][$ReparsePoint_Number] = $ReparseGuidSize
+	$RPArrSize[5][$ReparsePoint_Number] = 4
+	$RPArrSize[6][$ReparsePoint_Number] = 4
+	$RPArrSize[7][$ReparsePoint_Number] = 4
+	$RPArrSize[8][$ReparsePoint_Number] = 4
+	$RPArrSize[9][$ReparsePoint_Number] = $ReparseSubstituteNameLength*2
+	$RPArrSize[10][$ReparsePoint_Number] = $ReparsePrintNameLength*2
+	;-----if $ReparseSubstituteNameOffset<>0 then the order is reversed and parsed from end of $ReparseData ????????
+	If StringMid($ReparseData,1,4) <> "0000" Then
+		$ReparseSubstituteName = StringMid($ReparseData,StringLen($ReparseData)+1-($ReparseSubstituteNameLength*2),$ReparseSubstituteNameLength*2)
+;		ConsoleWrite("$ReparseSubstituteName: " & $ReparseSubstituteName & @crlf)
+		$ReparseSubstituteName = BinaryToString("0x"&$ReparseSubstituteName,2)
+		$ReparsePrintName = StringMid($ReparseData,StringLen($ReparseData)+1-($ReparseSubstituteNameLength*2)-($ReparsePrintNameLength*2),$ReparsePrintNameLength*2)
+;		ConsoleWrite("$ReparsePrintName: " & $ReparsePrintName & @crlf)
+		$ReparsePrintName = BinaryToString("0x"&$ReparsePrintName,2)
+		;Offsets
+		$RPArrOffset[9][$ReparsePoint_Number] = $ReparsePoint_Offset+64+$ReparseGuidSize+StringLen($ReparseData)-($ReparseSubstituteNameLength*2)
+		$RPArrOffset[10][$ReparsePoint_Number] = $ReparsePoint_Offset+64+$ReparseGuidSize+StringLen($ReparseData)-($ReparseSubstituteNameLength*2)-($ReparsePrintNameLength*2)
+	Else
+		$ReparseSubstituteName = StringMid($ReparseData,$LocalAttributeOffset+16+16,$ReparseSubstituteNameLength*2)
+;		ConsoleWrite("$ReparseSubstituteName: " & $ReparseSubstituteName & @crlf)
+		$ReparseSubstituteName = BinaryToString("0x"&$ReparseSubstituteName,2)
+		$ReparsePrintName = StringMid($ReparseData,($LocalAttributeOffset+32)+($ReparsePrintNameOffset*2),$ReparsePrintNameLength*2)
+;		ConsoleWrite("$ReparsePrintName: " & $ReparsePrintName & @crlf)
+		$ReparsePrintName = BinaryToString("0x"&$ReparsePrintName,2)
+		;Offsets
+		$RPArrOffset[9][$ReparsePoint_Number] = $ReparsePoint_Offset+64+$ReparseGuidSize+16+16
+		$RPArrOffset[10][$ReparsePoint_Number] = $ReparsePoint_Offset+64+$ReparseGuidSize+32+($ReparsePrintNameOffset*2)
+	EndIf
+	;Values
+	$RPArrValue[9][$ReparsePoint_Number] = $ReparseSubstituteName
+	$RPArrValue[10][$ReparsePoint_Number] = $ReparsePrintName
 EndFunc
-
